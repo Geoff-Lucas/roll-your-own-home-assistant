@@ -15,3 +15,4 @@ google-auth-oauthlib>=1.2
 requests>=2.31
 websockets>=12
 tzlocal>=5.0
+faster-whisper>=1.1

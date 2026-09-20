@@ -24,6 +24,7 @@ from .routers import (
     recipes,
     reminders,
     timers,
+    voice,
     weather,
 )
 from .sync.worker import run_sync_loop
@@ -77,6 +78,7 @@ app.include_router(weather.router, prefix="/api")
 app.include_router(locations.router, prefix="/api")
 app.include_router(browser.router, prefix="/api")
 app.include_router(timers.router, prefix="/api")
+app.include_router(voice.router, prefix="/api")
 app.include_router(ambient.router, prefix="/api")
 app.include_router(reminders.router, prefix="/api")
 app.include_router(meal_plan.router, prefix="/api")

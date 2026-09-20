@@ -7,6 +7,8 @@
   import WeatherWidget from './lib/WeatherWidget.svelte'
   import BrowserView from './lib/BrowserView.svelte'
   import TimerChips from './lib/timers/TimerChips.svelte'
+  import VoiceButton from './lib/voice/VoiceButton.svelte'
+  import VoiceOverlay from './lib/voice/VoiceOverlay.svelte'
   import RingingOverlay from './lib/timers/RingingOverlay.svelte'
   import { startTimers } from './lib/timers/store.js'
   import LocationBadge from './lib/LocationBadge.svelte'
@@ -83,6 +85,7 @@
         </label>
       {/if}
       <TimerChips />
+      <VoiceButton />
       <nav class="tabs">
         <button type="button" class:active={activeView === 'calendar'} onclick={() => (activeView = 'calendar')}>
           Calendar
@@ -120,6 +123,8 @@
 {/if}
 
 <DimOverlay />
+
+<VoiceOverlay />
 
 <RingingOverlay />
 

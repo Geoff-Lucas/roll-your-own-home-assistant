@@ -40,6 +40,24 @@ class Settings(BaseSettings):
     timer_ring_repeat_seconds: float = 2.5  # gap between chimes while something is ringing
     timer_ring_max_seconds: int = 300  # stop chiming (but keep showing the alert) after this long
 
+    # Voice assistant (see app/voice/). mic_device is an ALSA capture device for
+    # `arecord -D`; name-based ("plughw:CARD=Microphone,DEV=0") survives the USB
+    # card number changing between boots. Speech-to-text is local (faster-whisper)
+    # and never downloads a model on its own — run `python -m app.voice.setup`.
+    mic_device: str = "default"
+    voice_stt_model: str = "base.en"
+    voice_stt_auto_download: bool = False
+    voice_tts: str = "auto"  # auto | piper | espeak | none
+    voice_piper_binary: str = ""  # path to the piper executable
+    voice_piper_model: str = ""  # path to a piper voice (.onnx)
+    voice_silence_seconds: float = 1.1  # quiet this long after speech = finished
+    voice_start_timeout_seconds: float = 6.0  # give up if nothing is said
+    voice_max_seconds: float = 15.0
+
+    @property
+    def voice_models_dir(self) -> Path:
+        return self.data_dir / "voice" / "models"
+
     # Browser tab (see app/browser/) — a second, real Chromium window the
     # backend places under the app's header and steers over the DevTools
     # protocol. Only meaningful on the kiosk itself (needs a display, chromium,

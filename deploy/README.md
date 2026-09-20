@@ -131,6 +131,39 @@ Check it from the kiosk with `curl -X POST http://127.0.0.1:8000/api/timers/test
 (plays the timer chime once). The USB microphone needs no setup — it is
 PulseAudio's default input.
 
+### Voice assistant (tap the 🎤 in the header)
+
+Tap-to-talk: microphone → **local** speech-to-text (faster-whisper) → command
+matching → reply spoken and shown on screen. What you say never leaves the
+house. Commands today: timers, alarms and the stopwatch, the time and date, and
+the weather (see `backend/app/voice/skills/`). Pieces, and how to set each up:
+
+- **Microphone.** Set `HOME_ORGANIZER_MIC_DEVICE` to the ALSA capture device,
+  by *name* so it survives the USB card number changing between boots (find it
+  with `arecord -l`): `plughw:CARD=Microphone,DEV=0` on `h-asst`. Needs `arecord`
+  (alsa-utils).
+- **Speech model (one-time download).** The app never downloads it behind your
+  back. Run once, from `~/home_organizer/backend`:
+
+  ```bash
+  .venv/bin/python -m app.voice.setup          # ~145 MB, models/ under backend/data/voice
+  .venv/bin/python -m app.voice.setup --check  # report what is installed; downloads nothing
+  ```
+
+  Until it is installed, tapping 🎤 says so on screen. The model is chosen with
+  `HOME_ORGANIZER_VOICE_STT_MODEL` (default `base.en`; `small.en` is more accurate
+  and slower). Speech recognition needs the `faster-whisper` package, which is
+  in `requirements.txt`.
+- **Voice for replies.** `sudo apt install -y espeak-ng` gives a robotic but
+  zero-setup voice, used automatically. A natural-sounding **Piper** voice is
+  used instead if `HOME_ORGANIZER_VOICE_PIPER_BINARY` and
+  `HOME_ORGANIZER_VOICE_PIPER_MODEL` point at an installed Piper. Replies are
+  played through `HOME_ORGANIZER_AUDIO_DEVICE` (see Audio above).
+- **Checking it.** `curl http://127.0.0.1:8000/api/voice/status` says what is
+  missing. Everything after speech recognition can be tried without a
+  microphone: `curl -X POST http://127.0.0.1:8000/api/voice/text -H "Content-Type: application/json" -d '{"text":"what time is it"}'`
+  runs the command and speaks the reply.
+
 ## 3. Get the code onto the machine
 
 For the very first deploy, clone directly on the machine:

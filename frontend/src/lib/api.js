@@ -173,3 +173,23 @@ export function deleteTimer(id) {
 export function testChime() {
   return request('/timers/test-chime', { method: 'POST' })
 }
+
+export function getVoiceStatus() {
+  return request('/voice/status')
+}
+
+export function getVoiceState() {
+  return request('/voice/state')
+}
+
+export function startVoice() {
+  return request('/voice/start', { method: 'POST' })
+}
+
+export function stopVoice() {
+  return request('/voice/stop', { method: 'POST' })
+}
+
+export function sendVoiceText(text, speak = true) {
+  return requestJson('/voice/text', 'POST', { text, speak })
+}

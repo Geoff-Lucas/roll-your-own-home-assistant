@@ -7,6 +7,7 @@ Playback is fire-and-forget via `aplay`; failures are logged, never raised, so
 a missing or misconfigured speaker can't take a timer down with it.
 """
 
+import asyncio
 import logging
 import math
 import struct
@@ -98,3 +99,23 @@ def play_file(path: Path) -> bool:
 
 def play_chime() -> bool:
     return play_file(chime_path())
+
+
+async def play_and_wait(path: Path) -> bool:
+    """Play `path` and return when it has finished — for speech, where the next
+    step has to wait for the sentence to end. Independent of the chime's
+    one-at-a-time guard, so a reply can be spoken over a ringing timer."""
+    try:
+        process = await asyncio.create_subprocess_exec(
+            "aplay",
+            "-q",
+            "-D",
+            settings.audio_device,
+            str(path),
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+    except FileNotFoundError:
+        logger.warning("aplay not found — can't play audio (install alsa-utils)")
+        return False
+    return await process.wait() == 0
