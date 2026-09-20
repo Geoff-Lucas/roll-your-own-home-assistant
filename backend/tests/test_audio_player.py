@@ -93,3 +93,19 @@ def test_a_failing_aplay_is_reported_once_with_the_device_name(monkeypatch, tmp_
     warnings = [r.message for r in caplog.records if "aplay exited" in r.message]
     assert len(warnings) == 1
     assert "plughw:0,3" in warnings[0]
+
+
+def test_the_acknowledgement_tone_is_a_short_valid_wav_created_once(tmp_path, monkeypatch):
+    monkeypatch.setattr(player.settings, "data_dir", tmp_path)
+
+    path = player.ack_path()
+    stamp = path.stat().st_mtime_ns
+
+    assert path == tmp_path / "sounds" / "ack.wav"
+    with wave.open(str(path)) as wav:
+        assert (wav.getnchannels(), wav.getsampwidth(), wav.getframerate()) == (2, 2, 48000)
+        assert 0.2 < wav.getnframes() / wav.getframerate() < 0.6  # brief: this is a cue, not a jingle
+        data = wav.readframes(wav.getnframes())
+    assert any(byte != 0 for byte in data)
+    assert player.ack_path().stat().st_mtime_ns == stamp
+

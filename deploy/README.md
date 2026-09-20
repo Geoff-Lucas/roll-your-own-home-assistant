@@ -159,6 +159,25 @@ the weather (see `backend/app/voice/skills/`). Pieces, and how to set each up:
   used instead if `HOME_ORGANIZER_VOICE_PIPER_BINARY` and
   `HOME_ORGANIZER_VOICE_PIPER_MODEL` point at an installed Piper. Replies are
   played through `HOME_ORGANIZER_AUDIO_DEVICE` (see Audio above).
+- **Hands-free "Hey Jarvis".** Set `HOME_ORGANIZER_VOICE_WAKEWORD_ENABLED=true`
+  and restart. A background listener keeps the microphone open and feeds it,
+  80 ms at a time, to a small local model (openWakeWord's `hey_jarvis`, about
+  3 ms of CPU per frame). The audio is only compared against that model and
+  discarded — nothing is recorded or recognized until the phrase is heard; then
+  a short tone plays, the panel opens, and it works exactly like a tap. It is
+  off by default because it holds the microphone open. The model ships inside
+  the `openwakeword` package, which is pinned to 0.4.0: newer releases need
+  `tflite-runtime`, which has no build for Python 3.13.
+  Tune with `HOME_ORGANIZER_VOICE_WAKEWORD_THRESHOLD` (default `0.5`; lower is
+  more sensitive and triggers on more things). `GET /api/voice/status` shows
+  `recent_peak_level` (loudest audio the mic heard in the last ~10 s) and
+  `recent_peak_score` (how close the model got): a quick way to tell "the mic
+  can't hear me" from "it heard me but didn't recognize the phrase".
+- **Changing the reply voice.** With espeak-ng: `HOME_ORGANIZER_VOICE_ESPEAK_VOICE`
+  (e.g. `en-us+f3` for a woman's voice, `en-gb`, `en-us+m3`) and
+  `HOME_ORGANIZER_VOICE_ESPEAK_SPEED` (words per minute, default 160). List the
+  options with `espeak-ng --voices=en`. Natural-sounding voices need Piper (see
+  above).
 - **Checking it.** `curl http://127.0.0.1:8000/api/voice/status` says what is
   missing. Everything after speech recognition can be tried without a
   microphone: `curl -X POST http://127.0.0.1:8000/api/voice/text -H "Content-Type: application/json" -d '{"text":"what time is it"}'`

@@ -24,6 +24,7 @@ def status() -> dict:
         "microphone": shutil.which("arecord") is not None,
         "speech_recognition": {"ready": ready, "detail": detail},
         "speaker": speaker.name if speaker else None,
+        "wake_word": voice.wake_status(),
     }
 
 

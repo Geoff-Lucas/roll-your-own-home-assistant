@@ -119,3 +119,42 @@ async def play_and_wait(path: Path) -> bool:
         logger.warning("aplay not found — can't play audio (install alsa-utils)")
         return False
     return await process.wait() == 0
+
+
+def _blip(hz: float, start: float, length: float, total: int, amp: float) -> list[float]:
+    """A short soft note with a quick attack and fade, so it never clicks."""
+    samples = [0.0] * total
+    first = int(start * _RATE)
+    count = int(length * _RATE)
+    for i in range(count):
+        if first + i >= total:
+            break
+        t = i / _RATE
+        envelope = min(1.0, t / 0.008, (length - t) / 0.05)
+        samples[first + i] = amp * max(0.0, envelope) * math.sin(2 * math.pi * hz * t)
+    return samples
+
+
+def write_ack(path: Path) -> None:
+    """The "I'm listening" tone: two quick rising notes, clearly not the timer chime."""
+    total = int(0.36 * _RATE)
+    low = _blip(880.0, 0.0, 0.16, total, 0.5)
+    high = _blip(1318.5, 0.13, 0.23, total, 0.5)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with wave.open(str(path), "wb") as out:
+        out.setnchannels(2)
+        out.setsampwidth(2)
+        out.setframerate(_RATE)
+        frames = bytearray()
+        for a, b in zip(low, high):
+            value = max(-1.0, min(1.0, a + b))
+            frames += struct.pack("<hh", int(value * 32767), int(value * 32767))
+        out.writeframes(bytes(frames))
+
+
+def ack_path() -> Path:
+    path = settings.data_dir / "sounds" / "ack.wav"
+    if not path.exists():
+        write_ack(path)
+    return path
+

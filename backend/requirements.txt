@@ -16,3 +16,6 @@ requests>=2.31
 websockets>=12
 tzlocal>=5.0
 faster-whisper>=1.1
+# Pinned: 0.5+ requires tflite-runtime, which has no build for Python 3.13. 0.4.0 bundles
+# the hey_jarvis model and runs on onnxruntime alone.
+openwakeword==0.4.0

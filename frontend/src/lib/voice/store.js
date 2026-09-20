@@ -38,6 +38,36 @@ async function poll() {
   }
 }
 
+const WATCH_MS = 700
+const BUSY = ['listening', 'transcribing', 'thinking', 'speaking']
+let watchTimer
+
+/**
+ * Keep an eye out for an interaction that started without a tap — i.e. after
+ * "Hey Jarvis" — and bring the panel up for it. Cheap: one small local request
+ * every 0.7s while the panel is closed.
+ */
+export function watchVoice() {
+  clearInterval(watchTimer)
+  watchTimer = setInterval(async () => {
+    if (get(voiceOpen)) return
+    try {
+      const snapshot = await getVoiceState()
+      if (BUSY.includes(snapshot.state)) {
+        clearTimeout(closeTimer)
+        voice.set(snapshot)
+        voiceOpen.set(true)
+        wake() // leave the photo carousel
+        stopPolling()
+        pollTimer = setInterval(poll, POLL_MS)
+      }
+    } catch {
+      // Backend briefly unavailable (e.g. restarting): try again next time.
+    }
+  }, WATCH_MS)
+  return () => clearInterval(watchTimer)
+}
+
 export async function startListening() {
   clearTimeout(closeTimer)
   voiceOpen.set(true)

@@ -23,6 +23,9 @@ class FakeVoice:
 
         self.transcriber = Transcriber()
 
+    def wake_status(self):
+        return {"enabled": True, "listening": True, "phrase": "Hey Jarvis"}
+
     async def start(self):
         if self.busy_on_start:
             raise VoiceBusy("Already listening")
@@ -125,3 +128,4 @@ def test_status_explains_what_is_missing(setup, monkeypatch):
     assert body["speech_recognition"]["ready"] is False
     assert "python -m app.voice.setup" in body["speech_recognition"]["detail"]
     assert body["speaker"] is None
+    assert body["wake_word"] == {"enabled": True, "listening": True, "phrase": "Hey Jarvis"}

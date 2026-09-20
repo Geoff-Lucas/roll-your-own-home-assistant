@@ -196,6 +196,30 @@ async def test_espeak_renders_then_plays_the_file(monkeypatch):
 
 
 @pytest.mark.anyio
+async def test_the_configured_espeak_voice_and_speed_are_used(monkeypatch):
+    monkeypatch.setattr(tts.settings, "voice_espeak_voice", "en-us+f3")
+    monkeypatch.setattr(tts.settings, "voice_espeak_speed", 175)
+    ran = []
+
+    async def fake_run(*command, stdin=None):
+        ran.append(command)
+        open(command[command.index("-w") + 1], "wb").write(b"RIFF")
+        return 0
+
+    async def fake_play(path):
+        return True
+
+    monkeypatch.setattr(tts, "_run", fake_run)
+    monkeypatch.setattr(tts, "play_and_wait", fake_play)
+
+    await tts.EspeakSpeaker().speak("Hello")
+
+    command = ran[0]
+    assert command[command.index("-v") + 1] == "en-us+f3"
+    assert command[command.index("-s") + 1] == "175"
+
+
+@pytest.mark.anyio
 async def test_a_failed_render_is_an_error_not_silence(monkeypatch):
     async def failing(*command, stdin=None):
         return 1

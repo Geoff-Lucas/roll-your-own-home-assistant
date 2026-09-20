@@ -1,6 +1,8 @@
 import asyncio
 import contextlib
+import logging
 from contextlib import asynccontextmanager
+from typing import Optional
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -29,7 +31,26 @@ from .routers import (
 )
 from .sync.worker import run_sync_loop
 from .timers.alerts import run_timer_loop
+from .voice.session import voice as voice_session
+from .voice.wakeword import OpenWakeWordDetector, WakeWordListener
 from .weather import run_weather_loop
+
+logger = logging.getLogger(__name__)
+
+
+def build_wake_listener() -> Optional[WakeWordListener]:
+    """The always-on "Hey Jarvis" listener, or None when it is switched off or
+    can't run (the app carries on either way)."""
+    if not settings.voice_wakeword_enabled:
+        return None
+    detector = OpenWakeWordDetector()
+    ready, why = detector.status()
+    if not ready:
+        logger.warning("Wake word is enabled but unavailable: %s", why)
+        return None
+    listener = WakeWordListener(detector=detector, on_wake=lambda: voice_session.start(ack=True))
+    voice_session.attach_wake(listener)
+    return listener
 
 
 @asynccontextmanager
@@ -43,6 +64,9 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(run_weather_loop()),
         asyncio.create_task(run_timer_loop()),
     ]
+    wake_listener = build_wake_listener()
+    if wake_listener is not None:
+        background_tasks.append(asyncio.create_task(wake_listener.run()))
     yield
     await browser_controller.shutdown()
     for task in background_tasks:

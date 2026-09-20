@@ -11,10 +11,11 @@ import logging
 import time
 from collections import deque
 from datetime import datetime, timezone
-from typing import Callable, Optional
+from typing import Awaitable, Callable, Optional
 
 from sqlmodel import Session
 
+from ..audio.player import ack_path, play_and_wait
 from ..db import engine
 from ..locations import get_current_location
 from ..time_utils import to_naive_utc
@@ -53,6 +54,11 @@ def understand(text: str) -> Reply:
         return route(text, build_context(session))
 
 
+async def play_ack() -> None:
+    """The short "I'm listening" tone after the wake word."""
+    await play_and_wait(ack_path())
+
+
 class VoiceSession:
     def __init__(
         self,
@@ -61,13 +67,21 @@ class VoiceSession:
         transcriber=None,
         speaker_factory: Callable[[], Optional[Speaker]] = choose_speaker,
         understand_fn: Callable[[str], Reply] = understand,
+        ack_fn: Callable[[], Awaitable[None]] = play_ack,
     ) -> None:
         self.recorder = recorder or Recorder()
         self.transcriber = transcriber or WhisperTranscriber()
         self._speaker_factory = speaker_factory
         self._understand = understand_fn
+        self._ack = ack_fn
         self._stop = asyncio.Event()
         self._task: Optional[asyncio.Task] = None
+        # The always-on wake-word listener, if one is running. The microphone can
+        # only be opened by one thing at a time, so it is paused while a
+        # conversation uses it and resumed shortly after the reply has been
+        # spoken (the delay keeps it from hearing the tail of the reply).
+        self.wake = None
+        self.resume_delay = 0.6
         # The last few interactions, in memory only (gone on restart): what was
         # heard vs. answered, and how long each stage took — for tuning against
         # real use ("it heard X when I said Y"), never persisted.
@@ -113,30 +127,61 @@ class VoiceSession:
                 **self.timing,
             }
         )
+        self._resume_wake()
 
     def _on_level(self, rms_level: float) -> None:
         self.level = min(1.0, rms_level / LEVEL_FULL_SCALE)
 
     # --- listening by microphone --------------------------------------------
 
-    async def start(self) -> None:
+    def attach_wake(self, listener) -> None:
+        self.wake = listener
+
+    def wake_status(self) -> dict:
+        if self.wake is None:
+            return {"enabled": False, "listening": False, "phrase": None}
+        return {
+            "enabled": True,
+            "listening": self.wake.listening,
+            "phrase": self.wake.phrase,
+            "threshold": self.wake.threshold,
+            "recent_peak_score": round(self.wake.recent_peak_score, 3),
+            "recent_peak_level": round(self.wake.recent_peak_level),
+        }
+
+    def _resume_wake(self) -> None:
+        if self.wake is None:
+            return
+        try:
+            asyncio.get_running_loop().call_later(self.resume_delay, self.wake.resume)
+        except RuntimeError:  # no running loop (e.g. finishing during shutdown)
+            self.wake.resume()
+
+    async def start(self, ack: bool = False) -> None:
+        """Begin listening. `ack` plays the short tone first — used after the
+        wake word, so the person knows to speak now (and the microphone isn't
+        open while the tone plays, or it would hear the tone)."""
         if self.busy:
             raise VoiceBusy("Already listening")
         self._reset()
         self._stop.clear()
         self.state = "listening"
-        self._task = asyncio.create_task(self._listen())
+        self._task = asyncio.create_task(self._listen(ack))
 
     def stop(self) -> None:
         """End the recording now (whatever was heard so far is still processed)."""
         self._stop.set()
 
-    async def _listen(self) -> None:
+    async def _listen(self, ack: bool = False) -> None:
         try:
+            if self.wake is not None:
+                await self.wake.pause()  # release the microphone
             ready, why = self.transcriber.status()
             if not ready:
                 self._finish(error=why)
                 return
+            if ack:
+                await self._ack()
             recording = await self.recorder.record(self._stop, self._on_level)
             if not recording.usable:
                 self._finish(error="I didn't hear anything.")

@@ -9,6 +9,7 @@
   import TimerChips from './lib/timers/TimerChips.svelte'
   import VoiceButton from './lib/voice/VoiceButton.svelte'
   import VoiceOverlay from './lib/voice/VoiceOverlay.svelte'
+  import { watchVoice } from './lib/voice/store.js'
   import RingingOverlay from './lib/timers/RingingOverlay.svelte'
   import { startTimers } from './lib/timers/store.js'
   import LocationBadge from './lib/LocationBadge.svelte'
@@ -36,6 +37,7 @@
   onMount(async () => {
     hideBrowser().catch(() => {})
     startTimers()
+    watchVoice()
 
     try {
       accounts = await getAccounts()

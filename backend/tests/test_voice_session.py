@@ -63,7 +63,24 @@ class FakeSpeaker:
         self.said.append(text)
 
 
-def make(recorder=None, transcriber=None, speaker=None, reply=Reply("Timer set for 10 minutes."), understood=None):
+class FakeWake:
+    phrase = "Hey Jarvis"
+    listening = True
+    threshold = 0.5
+    recent_peak_score = 0.25
+    recent_peak_level = 1200.4
+
+    def __init__(self, log=None):
+        self.log = log if log is not None else []
+
+    async def pause(self):
+        self.log.append("pause")
+
+    def resume(self):
+        self.log.append("resume")
+
+
+def make(recorder=None, transcriber=None, speaker=None, reply=Reply("Timer set for 10 minutes."), understood=None, ack=None, wake=None):
     heard = []
 
     def understand(text):
@@ -75,7 +92,11 @@ def make(recorder=None, transcriber=None, speaker=None, reply=Reply("Timer set f
         transcriber=transcriber or FakeTranscriber(),
         speaker_factory=lambda: speaker,
         understand_fn=understand,
+        **({"ack_fn": ack} if ack else {}),
     )
+    if wake is not None:
+        session.attach_wake(wake)
+        session.resume_delay = 0  # don't make the tests wait out the real settling time
     for part in (session.recorder, speaker):
         if part is not None:
             part.session = session
@@ -350,3 +371,118 @@ async def test_the_history_is_capped_and_a_new_interaction_does_not_inherit_old_
 
     assert len(session.history) == 25
     assert "recorded_seconds" not in session.history[-1]
+
+
+# --- hands-free: sharing the microphone with the wake-word listener ----------
+
+
+@pytest.mark.anyio
+async def test_the_wake_listener_is_paused_before_recording_and_resumed_after_the_reply():
+    log = []
+    wake = FakeWake(log)
+
+    class LoggingRecorder(FakeRecorder):
+        async def record(self, stop, on_level):
+            log.append("record")
+            return await super().record(stop, on_level)
+
+    speaker = FakeSpeaker()
+    speaker_speak = speaker.speak
+
+    async def logged_speak(text):
+        log.append("speak")
+        await speaker_speak(text)
+
+    speaker.speak = logged_speak
+    session = make(recorder=LoggingRecorder(), speaker=speaker, wake=wake)
+
+    await run(session)
+    await asyncio.sleep(0.01)
+
+    # The microphone is released first, and only handed back once the reply is done.
+    assert log == ["pause", "record", "speak", "resume"]
+
+
+@pytest.mark.anyio
+async def test_the_wake_listener_is_resumed_even_when_the_interaction_fails():
+    for session_kwargs in (
+        {"recorder": FakeRecorder(error=MicUnavailable("gone"))},
+        {"recorder": FakeRecorder(Recording(b"", "no_speech"))},
+        {"transcriber": FakeTranscriber(ready=(False, "model missing"))},
+        {"transcriber": FakeTranscriber(error=RuntimeError("boom"))},
+    ):
+        wake = FakeWake()
+        session = make(wake=wake, **session_kwargs)
+
+        await run(session)
+        await asyncio.sleep(0.01)
+
+        assert wake.log == ["pause", "resume"], session_kwargs  # never left deaf
+
+
+@pytest.mark.anyio
+async def test_the_acknowledgement_tone_plays_before_the_microphone_opens():
+    order = []
+
+    async def ack():
+        order.append("ack")
+
+    class OrderedRecorder(FakeRecorder):
+        async def record(self, stop, on_level):
+            order.append("record")
+            return await super().record(stop, on_level)
+
+    session = make(recorder=OrderedRecorder(), ack=ack)
+
+    await session.start(ack=True)
+    await session._task
+
+    assert order == ["ack", "record"]  # not the other way: the mic would hear the tone
+
+
+@pytest.mark.anyio
+async def test_a_plain_tap_has_no_acknowledgement_tone():
+    played = []
+
+    async def ack():
+        played.append(1)
+
+    session = make(ack=ack)
+
+    await session.start()
+    await session._task
+
+    assert played == []
+
+
+@pytest.mark.anyio
+async def test_the_interface_shows_listening_immediately_even_while_the_tone_plays():
+    seen = []
+    session = make()
+
+    async def slow_ack():
+        seen.append(session.state)
+
+    session._ack = slow_ack
+
+    await session.start(ack=True)
+    assert session.state == "listening"  # the panel can open before the tone has finished
+    await session._task
+
+    assert seen == ["listening"]
+
+
+def test_wake_status_reflects_whether_a_listener_is_attached():
+    plain = make()
+    assert plain.wake_status() == {"enabled": False, "listening": False, "phrase": None}
+
+    plain.attach_wake(FakeWake())
+    assert plain.wake_status() == {
+        "enabled": True,
+        "listening": True,
+        "phrase": "Hey Jarvis",
+        "threshold": 0.5,
+        "recent_peak_score": 0.25,
+        "recent_peak_level": 1200,
+    }
+

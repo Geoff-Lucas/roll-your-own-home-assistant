@@ -55,7 +55,10 @@ class EspeakSpeaker:
         with tempfile.TemporaryDirectory() as tmp:
             wav = Path(tmp) / "speech.wav"
             # "--" so a reply that begins with a dash is never read as an option.
-            code = await _run("espeak-ng", "-v", "en-us", "-s", "160", "-w", str(wav), "--", text)
+            code = await _run(
+                "espeak-ng", "-v", settings.voice_espeak_voice, "-s", str(settings.voice_espeak_speed),
+                "-w", str(wav), "--", text,
+            )  # fmt: skip
             if code != 0 or not wav.exists():
                 raise SpeechError("espeak-ng couldn't render the reply")
             await play_and_wait(wav)

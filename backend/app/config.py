@@ -48,11 +48,23 @@ class Settings(BaseSettings):
     voice_stt_model: str = "base.en"
     voice_stt_auto_download: bool = False
     voice_tts: str = "auto"  # auto | piper | espeak | none
+    # espeak-ng voice and speed (words per minute). Voices are language codes with
+    # optional variants: "en-us", "en-gb", "en-us+f3" (a woman), "en-us+m3", "en-us+whisper".
+    # List them with `espeak-ng --voices=en`; variants are in espeak-ng-data/voices/!v.
+    voice_espeak_voice: str = "en-us"
+    voice_espeak_speed: int = 160
     voice_piper_binary: str = ""  # path to the piper executable
     voice_piper_model: str = ""  # path to a piper voice (.onnx)
     voice_silence_seconds: float = 1.1  # quiet this long after speech = finished
     voice_start_timeout_seconds: float = 6.0  # give up if nothing is said
     voice_max_seconds: float = 15.0
+    # Hands-free: say "Hey Jarvis" instead of tapping. Off by default because it
+    # keeps the microphone open all the time (the audio is only ever compared
+    # against the wake-word model and thrown away; nothing is recorded or
+    # recognized until the phrase is heard).
+    voice_wakeword_enabled: bool = False
+    voice_wakeword_threshold: float = 0.5  # 0-1; lower = more sensitive, more false triggers
+    voice_wakeword_cooldown_seconds: float = 2.0
 
     @property
     def voice_models_dir(self) -> Path:
