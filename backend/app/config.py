@@ -53,11 +53,14 @@ class Settings(BaseSettings):
     # List them with `espeak-ng --voices=en`; variants are in espeak-ng-data/voices/!v.
     voice_espeak_voice: str = "en-us"
     voice_espeak_speed: int = 160
-    # Piper: blank binary = the `piper` installed beside this app's Python (pip install
-    # piper-tts). The voice is a name ("en_US-lessac-medium", looked up in data/voice/piper;
-    # fetch one with `python -m app.voice.setup --piper NAME`) or a path to a .onnx file.
-    voice_piper_binary: str = ""
+    # Piper (the piper-tts package, run inside this app). The voice is a name
+    # ("en_US-amy-medium", looked up in data/voice/piper; fetch one with
+    # `python -m app.voice.setup --piper NAME`) or a path to a .onnx file.
     voice_piper_model: str = ""
+    # When the screen is asleep (it blanks after 10 minutes idle, and the monitor's
+    # speakers go with it), the wake word and ringing timers wake it. The monitor
+    # then takes a moment to resync before it can show or play anything.
+    display_wake_settle_seconds: float = 1.5
     voice_silence_seconds: float = 1.1  # quiet this long after speech = finished
     voice_start_timeout_seconds: float = 6.0  # give up if nothing is said
     voice_max_seconds: float = 15.0

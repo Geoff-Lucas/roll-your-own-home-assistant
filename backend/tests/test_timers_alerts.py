@@ -42,6 +42,26 @@ def cycle(clock, *, listen=True, ringing=(True, True, True), repeat=2.5, log=Non
 
 
 @pytest.mark.anyio
+async def test_each_chime_first_wakes_a_sleeping_screen(monkeypatch):
+    order = []
+
+    async def wake():
+        order.append("wake")
+
+    async def play(path):
+        order.append("play")
+
+    monkeypatch.setattr(alerts, "wake_display", wake)
+    monkeypatch.setattr(alerts, "play_and_wait", play)
+
+    await alerts._play_chime()
+    await alerts._play_chime()
+
+    # Every time, not once: the screen can blank again while something keeps ringing.
+    assert order == ["wake", "play", "wake", "play"]
+
+
+@pytest.mark.anyio
 async def test_a_cycle_is_chime_then_a_moment_then_a_listening_window():
     clock = Clock()
     run, log = cycle(clock)

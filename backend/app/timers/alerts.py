@@ -19,6 +19,7 @@ from sqlmodel import Session
 from ..audio.player import chime_path, play_and_wait
 from ..config import settings
 from ..db import engine
+from ..display import wake_display
 from ..time_utils import to_naive_utc
 from . import service
 
@@ -34,6 +35,8 @@ def _ringing_audibly() -> bool:
 
 
 async def _play_chime() -> None:
+    # Every cycle, not just the first: a screen that blanked mid-alarm has to come back too.
+    await wake_display()
     await play_and_wait(chime_path())
 
 

@@ -1,5 +1,6 @@
 import sys
 import types
+import wave
 
 import pytest
 
@@ -230,28 +231,49 @@ async def test_a_failed_render_is_an_error_not_silence(monkeypatch):
         await tts.EspeakSpeaker().speak("hello")
 
 
+class FakePiperVoice:
+    """Stands in for piper.PiperVoice: counts loads and writes a tiny real WAV."""
+
+    loads = []
+
+    @classmethod
+    def load(cls, model):
+        cls.loads.append(model)
+        return cls()
+
+    def synthesize_wav(self, text, wav_file):
+        self.spoken = text
+        wav_file.setnchannels(1)
+        wav_file.setsampwidth(2)
+        wav_file.setframerate(22050)
+        wav_file.writeframes(b"\x00\x00" * 2205)
+
+
 @pytest.fixture
-def piper_files(tmp_path, monkeypatch):
-    """A fake piper executable and voice on disk, with the settings pointing at them."""
-    binary = tmp_path / "piper"
-    binary.write_bytes(b"")
+def piper(tmp_path, monkeypatch):
+    """A voice file on disk, a fake piper package installed, and nothing loaded yet."""
     voices = tmp_path / "voices"
     voices.mkdir()
+    (voices / "en_US-amy-medium.onnx").write_bytes(b"")
     (voices / "en_US-lessac-medium.onnx").write_bytes(b"")
-    monkeypatch.setattr(tts.settings, "voice_piper_binary", str(binary))
-    monkeypatch.setattr(tts.settings, "voice_piper_model", "en_US-lessac-medium")
+    monkeypatch.setattr(tts.settings, "voice_piper_model", "en_US-amy-medium")
+    monkeypatch.setattr(tts.settings, "voice_tts", "auto")
     monkeypatch.setattr(type(tts.settings), "voice_piper_dir", property(lambda self: voices))
-    return binary, voices
+    FakePiperVoice.loads = []
+    package = types.ModuleType("piper")
+    package.PiperVoice = FakePiperVoice
+    monkeypatch.setitem(sys.modules, "piper", package)
+    monkeypatch.setattr(tts, "piper_installed", lambda: True)
+    monkeypatch.setattr(tts, "_piper_loaded", None)
+    return voices
 
 
-def test_a_voice_is_found_by_name_in_the_piper_folder(piper_files):
-    _, voices = piper_files
-
-    assert tts.piper_model() == voices / "en_US-lessac-medium.onnx"
+def test_a_voice_is_found_by_name_in_the_piper_folder(piper):
+    assert tts.piper_model() == piper / "en_US-amy-medium.onnx"
     assert tts.piper_available() is True
 
 
-def test_a_voice_can_be_a_path_instead(piper_files, tmp_path, monkeypatch):
+def test_a_voice_can_be_a_path_instead(piper, tmp_path, monkeypatch):
     elsewhere = tmp_path / "other.onnx"
     elsewhere.write_bytes(b"")
     monkeypatch.setattr(tts.settings, "voice_piper_model", str(elsewhere))
@@ -259,7 +281,7 @@ def test_a_voice_can_be_a_path_instead(piper_files, tmp_path, monkeypatch):
     assert tts.piper_model() == elsewhere
 
 
-def test_piper_is_unavailable_without_a_chosen_or_present_voice(piper_files, monkeypatch):
+def test_piper_is_unavailable_without_a_chosen_or_present_voice(piper, monkeypatch):
     monkeypatch.setattr(tts.settings, "voice_piper_model", "")
     assert tts.piper_model() is None and tts.piper_available() is False
 
@@ -267,25 +289,74 @@ def test_piper_is_unavailable_without_a_chosen_or_present_voice(piper_files, mon
     assert tts.piper_model() is None and tts.piper_available() is False
 
 
-def test_piper_is_unavailable_when_the_configured_program_is_missing(piper_files, tmp_path, monkeypatch):
-    monkeypatch.setattr(tts.settings, "voice_piper_binary", str(tmp_path / "nope"))
+def test_piper_is_unavailable_when_the_package_is_not_installed(piper, monkeypatch):
+    monkeypatch.setattr(tts, "piper_installed", lambda: False)
 
-    assert tts.piper_binary() is None and tts.piper_available() is False
+    assert tts.piper_available() is False
 
 
-def test_the_piper_program_is_found_beside_the_apps_python_by_default(piper_files, tmp_path, monkeypatch):
-    bin_dir = tmp_path / "venv-bin"
-    bin_dir.mkdir()
-    program = bin_dir / ("piper.exe" if tts.os.name == "nt" else "piper")
-    program.write_bytes(b"")
-    monkeypatch.setattr(tts.settings, "voice_piper_binary", "")
-    monkeypatch.setattr(tts.sys, "executable", str(bin_dir / "python"))
+def test_the_voice_is_loaded_once_and_kept_for_every_reply(piper):
+    model = piper / "en_US-amy-medium.onnx"
 
-    assert tts.piper_binary() == program
+    first = tts._load_piper(model)
+    second = tts._load_piper(model)
+
+    assert first is second
+    assert FakePiperVoice.loads == [model]  # a fresh load costs over a second, every reply
+
+
+def test_choosing_a_different_voice_loads_that_one(piper):
+    amy, lessac = piper / "en_US-amy-medium.onnx", piper / "en_US-lessac-medium.onnx"
+
+    tts._load_piper(amy)
+    tts._load_piper(lessac)
+
+    assert FakePiperVoice.loads == [amy, lessac]
+
+
+def test_rendering_writes_a_playable_wav(piper, tmp_path):
+    wav = tmp_path / "out.wav"
+
+    tts._render_piper(piper / "en_US-amy-medium.onnx", "Hello there", wav)
+
+    with wave.open(str(wav)) as written:
+        assert written.getnframes() == 2205 and written.getframerate() == 22050
 
 
 @pytest.mark.anyio
-async def test_speaking_with_piper_but_no_voice_is_an_error(piper_files, monkeypatch):
+async def test_warming_up_loads_the_voice_before_anyone_asks_for_a_reply(piper):
+    await tts.warm_up()
+
+    assert FakePiperVoice.loads == [piper / "en_US-amy-medium.onnx"]
+
+
+@pytest.mark.anyio
+async def test_warming_up_does_nothing_when_piper_is_not_wanted_or_not_ready(piper, monkeypatch):
+    monkeypatch.setattr(tts.settings, "voice_tts", "espeak")
+    await tts.warm_up()
+
+    monkeypatch.setattr(tts.settings, "voice_tts", "auto")
+    monkeypatch.setattr(tts.settings, "voice_piper_model", "")
+    await tts.warm_up()
+
+    assert FakePiperVoice.loads == []
+
+
+@pytest.mark.anyio
+async def test_a_voice_that_fails_to_load_at_startup_is_logged_not_fatal(piper, monkeypatch, caplog):
+    def broken(model):
+        raise RuntimeError("corrupt model")
+
+    monkeypatch.setattr(FakePiperVoice, "load", classmethod(lambda cls, model: broken(model)))
+
+    with caplog.at_level("ERROR"):
+        await tts.warm_up()  # must not raise: the app starts, and replies fall back to failing softly
+
+    assert any("Couldn't load the Piper voice" in r.message for r in caplog.records)
+
+
+@pytest.mark.anyio
+async def test_speaking_with_piper_but_no_voice_is_an_error(piper, monkeypatch):
     monkeypatch.setattr(tts.settings, "voice_piper_model", "en_GB-not-downloaded")
 
     with pytest.raises(tts.SpeechError, match="voice file is missing"):
@@ -293,25 +364,43 @@ async def test_speaking_with_piper_but_no_voice_is_an_error(piper_files, monkeyp
 
 
 @pytest.mark.anyio
-async def test_piper_is_given_the_text_on_stdin(piper_files, monkeypatch):
-    binary, voices = piper_files
-    seen = {}
-
-    async def fake_run(*command, stdin=None):
-        seen["command"], seen["stdin"] = command, stdin
-        open(command[command.index("--output_file") + 1], "wb").write(b"RIFF")
-        return 0
+async def test_piper_renders_the_reply_then_plays_it(piper, monkeypatch):
+    played = []
 
     async def fake_play(path):
+        with wave.open(str(path)) as rendered:  # the file exists and is a real WAV at this point
+            played.append(rendered.getnframes())
         return True
 
-    monkeypatch.setattr(tts, "_run", fake_run)
     monkeypatch.setattr(tts, "play_and_wait", fake_play)
 
     await tts.PiperSpeaker().speak("Timer set for 10 minutes.")
 
-    assert seen["command"][:3] == (str(binary), "--model", str(voices / "en_US-lessac-medium.onnx"))
-    assert seen["stdin"] == b"Timer set for 10 minutes."
+    assert played == [2205]
+    assert FakePiperVoice.loads == [piper / "en_US-amy-medium.onnx"]
+
+
+@pytest.mark.anyio
+async def test_a_reply_with_nothing_to_say_is_not_rendered_or_played(piper, monkeypatch):
+    async def fake_play(path):
+        pytest.fail("nothing to play")
+
+    monkeypatch.setattr(tts, "play_and_wait", fake_play)
+
+    await tts.PiperSpeaker().speak("   ")
+
+    assert FakePiperVoice.loads == []
+
+
+@pytest.mark.anyio
+async def test_a_render_failure_is_a_speech_error(piper, monkeypatch):
+    def broken(model, text, wav):
+        raise RuntimeError("onnx exploded")
+
+    monkeypatch.setattr(tts, "_render_piper", broken)
+
+    with pytest.raises(tts.SpeechError, match="onnx exploded"):
+        await tts.PiperSpeaker().speak("hello")
 
 
 def test_setup_downloads_a_named_piper_voice(monkeypatch, tmp_path, capsys):

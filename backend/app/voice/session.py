@@ -17,6 +17,7 @@ from sqlmodel import Session
 
 from ..audio.player import ack_path, play_and_wait
 from ..db import engine
+from ..display import wake_display
 from ..locations import get_current_location
 from ..time_utils import to_naive_utc
 from ..timers import service
@@ -69,12 +70,14 @@ class VoiceSession:
         speaker_factory: Callable[[], Optional[Speaker]] = choose_speaker,
         understand_fn: Callable[[str], Reply] = understand,
         ack_fn: Callable[[], Awaitable[None]] = play_ack,
+        wake_screen_fn: Callable[[], Awaitable[object]] = wake_display,
     ) -> None:
         self.recorder = recorder or Recorder()
         self.transcriber = transcriber or WhisperTranscriber()
         self._speaker_factory = speaker_factory
         self._understand = understand_fn
         self._ack = ack_fn
+        self._wake_screen = wake_screen_fn
         self._stop = asyncio.Event()
         self._task: Optional[asyncio.Task] = None
         # The always-on wake-word listener, if one is running. The microphone can
@@ -183,6 +186,9 @@ class VoiceSession:
                     self._finish(error=why)
                     return
                 if ack:
+                    # Heard from across the room, so the screen may well be asleep — and
+                    # the tone would be lost, and the panel unseen, until it is awake.
+                    await self._wake_screen()
                     await self._ack()
                 recording = await self.recorder.record(self._stop, self._on_level)
             if not recording.usable:

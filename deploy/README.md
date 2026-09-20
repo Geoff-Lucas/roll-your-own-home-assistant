@@ -110,22 +110,35 @@ pointer events here. Adjust `MatchProduct` to your controller's name
 
 Sound goes through **one configurable ALSA device**, `HOME_ORGANIZER_AUDIO_DEVICE`
 in `backend/.env` (used with `aplay -D`; default `"default"`). On `h-asst` that
-is the monitor's own speakers over HDMI, with a catch worth knowing about:
+is the monitor's own speakers over HDMI, and the thing to know is that **the
+speakers are only there while the screen is awake**:
 
-- The monitor (PX275h) advertises audio in its EDID, but the AMD graphics driver
-  reports **no monitor on any HDMI audio pin** (`/proc/asound/card0/eld#*` all
-  say `monitor_present 0`). PulseAudio therefore marks every HDMI output
-  "not available" and only offers a dummy sink, so the default device is silent.
-- The raw ALSA device still plays: `plughw:0,3` reached the speakers (waking the
-  controller or re-probing it did not change the ELD report, so this is a
-  driver quirk to live with, not something the app can fix).
-- To find the right output on another machine, play something distinct on each
-  HDMI device and listen — e.g. `aplay -D plughw:0,3 x.wav`, then `0,7`, `0,8`
-  (list them with `aplay -l`). Then set it in `.env`:
-
-  ```
-  HOME_ORGANIZER_AUDIO_DEVICE=plughw:0,3
-  ```
+- When the screen blanks (X's screen saver, after 10 minutes idle) the HDMI link
+  drops and the monitor sleeps. The audio hardware then sees no monitor
+  (`/proc/asound/card0/eld#*` say `monitor_present 0`), PulseAudio swaps its HDMI
+  output for a null sink that swallows sound, and nothing can be heard. Awake,
+  the same files say `monitor_present 1`, `eld_valid 1` and PulseAudio offers a
+  proper HDMI sink. (An earlier version of these notes called this a driver bug;
+  it was measured with the screen asleep.)
+- **Use `pulse`** (`HOME_ORGANIZER_AUDIO_DEVICE=pulse`), not a raw device such as
+  `plughw:0,3`. When the screen wakes PulseAudio grabs the HDMI device for about
+  5 seconds while it re-detects the monitor, and a raw `aplay` in that window
+  fails with "Device or resource busy". Going through PulseAudio has no such
+  fight, and the browser's sound uses the same path.
+- The service needs `XDG_RUNTIME_DIR=/run/user/1000` (it is in
+  `home-organizer.service`; use your user's id from `id -u`) to reach that
+  PulseAudio. Without it `aplay -D pulse` says "Connection refused" and the app
+  is silent. Don't write it as `%U`: in a system service that means root.
+- **Waking the screen.** `app/display.py` wakes it (`xset s reset`) when the
+  "Hey Jarvis" wake word is heard and each time a timer or alarm chimes, then waits
+  1.5 s (`HOME_ORGANIZER_DISPLAY_WAKE_SETTLE_SECONDS`) for the monitor to resync,
+  so the acknowledgement tone or chime isn't lost. It knows the screen is asleep
+  when PulseAudio's default output is the null sink. Touching the screen wakes it
+  as usual. To stop the screen sleeping at all instead, run `xset s off` on the
+  kiosk (add it to `deploy/kiosk.sh` to keep it across reboots).
+- To find the right raw output on a machine without PulseAudio, play something
+  distinct on each HDMI device and listen — e.g. `aplay -D plughw:0,3 x.wav`,
+  then `0,7`, `0,8` (list them with `aplay -l`) — and put it in `.env`.
 
 Check it from the kiosk with `curl -X POST http://127.0.0.1:8000/api/timers/test-chime`
 (plays the timer chime once). The USB microphone needs no setup — it is
@@ -170,15 +183,18 @@ the weather (see `backend/app/voice/skills/`). Pieces, and how to set each up:
   `HOME_ORGANIZER_VOICE_PIPER_MODEL` is the voice's name (or a path to a
   `.onnx` file). Browse voices, with audio samples, at
   <https://rhasspy.github.io/piper-samples/>. `GET /api/voice/status` shows
-  `"speaker": "piper"` when it is in use. Each reply takes about 2 s to render
-  on this mini PC, on top of the speaker's start-up delay. Replies are played
-  through `HOME_ORGANIZER_AUDIO_DEVICE` (see Audio above).
+  `"speaker": "piper"` when it is in use. The app keeps the voice loaded (about
+  90 MB when loaded at startup, growing to around 200 MB once it has spoken), so
+  a reply renders in roughly 0.3 s;
+  running Piper as a separate program for every reply cost about 2 s each time.
+  Replies are played through `HOME_ORGANIZER_AUDIO_DEVICE` (see Audio above).
 - **Hands-free "Hey Jarvis".** Set `HOME_ORGANIZER_VOICE_WAKEWORD_ENABLED=true`
   and restart. A background listener keeps the microphone open and feeds it,
   80 ms at a time, to a small local model (openWakeWord's `hey_jarvis`, about
   3 ms of CPU per frame). The audio is only compared against that model and
   discarded — nothing is recorded or recognized until the phrase is heard; then
-  a short tone plays, the panel opens, and it works exactly like a tap. It is
+  a short tone plays, the panel opens, and it works exactly like a tap (if the
+  screen was asleep it is woken first — see Audio). It is
   off by default because it holds the microphone open. The model ships inside
   the `openwakeword` package, which is pinned to 0.4.0: newer releases need
   `tflite-runtime`, which has no build for Python 3.13.

@@ -32,6 +32,7 @@ from .routers import (
 from .sync.worker import run_sync_loop
 from .timers.alerts import run_timer_loop
 from .voice.session import voice as voice_session
+from .voice.tts import warm_up as warm_up_speech
 from .voice.wakeword import OpenWakeWordDetector, WakeWordListener
 from .weather import run_weather_loop
 
@@ -63,6 +64,7 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(run_sync_loop()),
         asyncio.create_task(run_weather_loop()),
         asyncio.create_task(run_timer_loop()),
+        asyncio.create_task(warm_up_speech()),
     ]
     wake_listener = build_wake_listener()
     if wake_listener is not None:

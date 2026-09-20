@@ -80,7 +80,11 @@ class FakeWake:
         self.log.append("resume")
 
 
-def make(recorder=None, transcriber=None, speaker=None, reply=Reply("Timer set for 10 minutes."), understood=None, ack=None, wake=None):
+async def no_wake():
+    """Stands in for waking the screen, which would otherwise run xset/pactl."""
+
+
+def make(recorder=None, transcriber=None, speaker=None, reply=Reply("Timer set for 10 minutes."), understood=None, ack=None, wake=None, wake_screen=None):
     heard = []
 
     def understand(text):
@@ -92,6 +96,7 @@ def make(recorder=None, transcriber=None, speaker=None, reply=Reply("Timer set f
         transcriber=transcriber or FakeTranscriber(),
         speaker_factory=lambda: speaker,
         understand_fn=understand,
+        wake_screen_fn=wake_screen or no_wake,
         **({"ack_fn": ack} if ack else {}),
     )
     if wake is not None:
@@ -438,6 +443,44 @@ async def test_the_acknowledgement_tone_plays_before_the_microphone_opens():
     await session._task
 
     assert order == ["ack", "record"]  # not the other way: the mic would hear the tone
+
+
+@pytest.mark.anyio
+async def test_the_screen_is_woken_before_the_tone_so_the_tone_is_not_lost():
+    order = []
+
+    async def wake_screen():
+        order.append("wake screen")
+
+    async def ack():
+        order.append("ack")
+
+    class OrderedRecorder(FakeRecorder):
+        async def record(self, stop, on_level):
+            order.append("record")
+            return await super().record(stop, on_level)
+
+    session = make(recorder=OrderedRecorder(), ack=ack, wake_screen=wake_screen)
+
+    await session.start(ack=True)
+    await session._task
+
+    assert order == ["wake screen", "ack", "record"]
+
+
+@pytest.mark.anyio
+async def test_a_tap_does_not_wake_the_screen_because_touching_it_already_has():
+    woken = []
+
+    async def wake_screen():
+        woken.append(1)
+
+    session = make(wake_screen=wake_screen)
+
+    await session.start()
+    await session._task
+
+    assert woken == []
 
 
 @pytest.mark.anyio

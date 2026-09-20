@@ -14,6 +14,11 @@ WorkingDirectory=/home/pi/home_organizer/backend
 Environment=PATH=/home/pi/home_organizer/backend/.venv/bin:/usr/local/bin:/usr/bin:/bin
 # The X display the kiosk runs on — needed to open and place the browser window.
 Environment=DISPLAY=:0
+# How the app finds the user's PulseAudio (which owns the speakers): without this,
+# `aplay -D pulse` from a service gets "Connection refused" and everything is silent.
+# 1000 is the first normal user's numeric id (`id -u`); change it if User= above differs.
+# (Don't use %U: in a system service it means root, not User=.)
+Environment=XDG_RUNTIME_DIR=/run/user/1000
 EnvironmentFile=-/home/pi/home_organizer/backend/.env
 ExecStart=/home/pi/home_organizer/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
 Restart=on-failure

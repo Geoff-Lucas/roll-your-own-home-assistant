@@ -9,16 +9,20 @@ same speaker path (and the same configured device) as the timer chime.
 """
 
 import asyncio
-import os
+import importlib.util
+import logging
 import re
 import shutil
-import sys
 import tempfile
+import threading
+import wave
 from pathlib import Path
 from typing import Optional, Protocol
 
 from ..audio.player import play_and_wait
 from ..config import settings
+
+logger = logging.getLogger(__name__)
 
 MAX_SPOKEN_CHARS = 400
 
@@ -66,16 +70,8 @@ class EspeakSpeaker:
             await play_and_wait(wav)
 
 
-def piper_binary() -> Optional[Path]:
-    """The piper executable: the configured one, else the one pip put beside our Python."""
-    if settings.voice_piper_binary:
-        path = Path(settings.voice_piper_binary)
-        return path if path.exists() else None
-    beside = Path(sys.executable).parent / ("piper.exe" if os.name == "nt" else "piper")
-    if beside.exists():
-        return beside
-    found = shutil.which("piper")
-    return Path(found) if found else None
+def piper_installed() -> bool:
+    return importlib.util.find_spec("piper") is not None
 
 
 def piper_model() -> Optional[Path]:
@@ -88,26 +84,65 @@ def piper_model() -> Optional[Path]:
     return path if path.exists() else None
 
 
+# Loading a voice takes over a second; rendering a sentence with it loaded takes
+# a fraction of that. So the voice stays in memory (one at a time) instead of
+# being loaded afresh for every reply.
+_piper_lock = threading.RLock()
+_piper_loaded: Optional[tuple] = None  # (model path, PiperVoice)
+
+
+def _load_piper(model: Path):
+    global _piper_loaded
+    with _piper_lock:
+        if _piper_loaded is None or _piper_loaded[0] != model:
+            from piper import PiperVoice
+
+            _piper_loaded = (model, PiperVoice.load(model))
+        return _piper_loaded[1]
+
+
+def _render_piper(model: Path, text: str, wav: Path) -> None:
+    """Blocking; call it in a thread."""
+    with _piper_lock:  # one render at a time: replies are spoken one after another anyway
+        voice = _load_piper(model)
+        with wave.open(str(wav), "wb") as out:
+            voice.synthesize_wav(text, out)
+
+
+async def warm_up() -> None:
+    """Load the chosen Piper voice now, so the first reply isn't the slow one."""
+    if settings.voice_tts not in ("auto", "piper") or not piper_installed():
+        return
+    model = piper_model()
+    if model is None:
+        return
+    try:
+        await asyncio.to_thread(_load_piper, model)
+        logger.info("Reply voice %s loaded", model.stem)
+    except Exception:
+        logger.exception("Couldn't load the Piper voice; replies will load it on demand")
+
+
 class PiperSpeaker:
     name = "piper"
 
     async def speak(self, text: str) -> None:
-        binary, model = piper_binary(), piper_model()
-        if binary is None or model is None:
+        model = piper_model()
+        if not piper_installed() or model is None:
             raise SpeechError("piper isn't installed, or its voice file is missing")
+        if not text.strip():
+            return
         with tempfile.TemporaryDirectory() as tmp:
             wav = Path(tmp) / "speech.wav"
-            code = await _run(
-                str(binary), "--model", str(model), "--output_file", str(wav),
-                stdin=text.encode("utf-8"),
-            )  # fmt: skip
-            if code != 0 or not wav.exists():
-                raise SpeechError("piper couldn't render the reply")
+            try:
+                await asyncio.to_thread(_render_piper, model, text, wav)
+            except Exception as exc:
+                raise SpeechError(f"piper couldn't render the reply: {exc}") from exc
             await play_and_wait(wav)
 
 
 def piper_available() -> bool:
-    return piper_binary() is not None and piper_model() is not None
+    return piper_installed() and piper_model() is not None
 
 
 def choose_speaker() -> Optional[Speaker]:
