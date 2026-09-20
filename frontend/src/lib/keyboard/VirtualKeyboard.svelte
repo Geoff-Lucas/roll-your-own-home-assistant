@@ -114,4 +114,13 @@
     max-width: 40rem;
     margin: 0 auto;
   }
+
+  /* simple-keyboard's default key height is 40px, which is tiny on this
+     1440x2560 kiosk panel — size it for a fingertip instead. Anchored on
+     .keyboard-wrap rather than .simple-keyboard because the library
+     overwrites its container's class list on init, which strips the
+     scoping class Svelte adds to that element. */
+  .keyboard-wrap :global(.hg-button) {
+    height: 3.5rem;
+  }
 </style>
