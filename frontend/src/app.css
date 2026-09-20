@@ -1,0 +1,20 @@
+:root {
+  color-scheme: light dark;
+  /* Base size is bumped up from a typical desktop default (18px) — this
+     runs on a 27" 2K portrait kiosk display, not a monitor read from arm's
+     length, so there's plenty of room to size up for readability. */
+  font: 22px/1.4 system-ui, 'Segoe UI', Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden; /* kiosk display — nothing here should scroll the whole page */
+}

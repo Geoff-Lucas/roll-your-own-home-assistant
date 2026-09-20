@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Home Organizer Kiosk
+Comment=Fullscreen Chromium pointed at the local Home Organizer backend
+# Invoked via `sh` so the script's executable bit (lost when copying from
+# Windows) doesn't matter. Adjust the path if the clone isn't ~/home_organizer.
+Exec=sh -c 'exec sh "$HOME/home_organizer/deploy/kiosk.sh"'
+X-GNOME-Autostart-enabled=true

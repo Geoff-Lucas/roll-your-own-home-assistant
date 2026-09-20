@@ -1,0 +1,19 @@
+#!/bin/sh
+# Installed as ~/.xinitrc — see deploy/README.md. No window manager: a kiosk
+# showing exactly one always-fullscreen browser window doesn't need one, and
+# skipping it is one less thing running on a 4GB Pi.
+
+xset s off
+xset -dpms
+xset s noblank
+
+exec chromium \
+  --kiosk \
+  --incognito \
+  --noerrdialogs \
+  --disable-infobars \
+  --disable-translate \
+  --no-first-run \
+  --overscroll-history-navigation=0 \
+  --disable-pinch \
+  http://localhost:8000/

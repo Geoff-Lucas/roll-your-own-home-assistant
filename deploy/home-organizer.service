@@ -1,0 +1,23 @@
+[Unit]
+Description=Home Organizer backend
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Change both of these if you used a different username during imaging or a
+# different clone location.
+User=pi
+WorkingDirectory=/home/pi/home_organizer/backend
+Environment=PATH=/home/pi/home_organizer/backend/.venv/bin
+EnvironmentFile=-/home/pi/home_organizer/backend/.env
+ExecStart=/home/pi/home_organizer/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+Restart=on-failure
+RestartSec=5
+
+# Bound to 127.0.0.1, not 0.0.0.0 — see PLAN.md "Security & credentials".
+# The kiosk browser runs on this same device, so there's no reason to expose
+# the API to the rest of the LAN until the Android companion app is real.
+
+[Install]
+WantedBy=multi-user.target

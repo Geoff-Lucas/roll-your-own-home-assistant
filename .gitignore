@@ -1,0 +1,10 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# App data (DB, encryption keys, local files) — never commit these
+backend/data/
+*.key
+.env
