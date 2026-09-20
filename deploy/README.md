@@ -134,8 +134,9 @@ speakers are only there while the screen is awake**:
   1.5 s (`HOME_ORGANIZER_DISPLAY_WAKE_SETTLE_SECONDS`) for the monitor to resync,
   so the acknowledgement tone or chime isn't lost. It knows the screen is asleep
   when PulseAudio's default output is the null sink. Touching the screen wakes it
-  as usual. To stop the screen sleeping at all instead, run `xset s off` on the
-  kiosk (add it to `deploy/kiosk.sh` to keep it across reboots).
+  as usual. For now the kiosk doesn't sleep at all: `deploy/kiosk.sh` runs
+  `xset s off` at login. Remove that line (and log in again, or run `xset s 600`)
+  to let the screen blank after 10 idle minutes; the wake-up above then takes over.
 - To find the right raw output on a machine without PulseAudio, play something
   distinct on each HDMI device and listen — e.g. `aplay -D plughw:0,3 x.wav`,
   then `0,7`, `0,8` (list them with `aplay -l`) — and put it in `.env`.

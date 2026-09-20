@@ -13,6 +13,12 @@ done
 # lands on a screen edge. (Bring them back for maintenance: `xfce4-panel &`.)
 xfce4-panel --quit 2>/dev/null
 
+# Never blank the screen. X's default blanks it after 10 idle minutes, which drops
+# the HDMI signal: the monitor sleeps and its speakers go silent with it, so the
+# wake word and alarms would be unseen and unheard. (The app can wake a sleeping
+# screen, see app/display.py, so to let it sleep again just remove this line.)
+xset s off
+
 # --password-store=basic: without it Chromium asks the system keyring for a
 # password store, and on an auto-login session the keyring is locked, so an
 # "Unlock Login Keyring" password dialog appears and grabs input. A kiosk
