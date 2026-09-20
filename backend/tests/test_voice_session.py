@@ -486,3 +486,35 @@ def test_wake_status_reflects_whether_a_listener_is_attached():
         "recent_peak_level": 1200,
     }
 
+
+
+@pytest.mark.anyio
+async def test_a_conversation_waits_for_the_microphone_lock_rather_than_fighting_for_the_device():
+    from app.voice.mic import mic_lock
+
+    recorder = FakeRecorder()
+    session = make(recorder=recorder)
+
+    await mic_lock.acquire()  # e.g. the "say stop" window is recording right now
+    try:
+        await session.start()
+        await asyncio.sleep(0.05)
+        assert recorder.calls == 0  # still waiting; never opened the device
+        assert session.state == "listening"  # (the screen already shows it)
+    finally:
+        mic_lock.release()
+
+    await session._task
+    assert recorder.calls == 1
+    assert not mic_lock.locked()
+
+
+@pytest.mark.anyio
+async def test_the_microphone_lock_is_released_when_a_conversation_fails():
+    from app.voice.mic import mic_lock
+
+    session = make(recorder=FakeRecorder(error=MicUnavailable("gone")))
+
+    await run(session)
+
+    assert not mic_lock.locked()

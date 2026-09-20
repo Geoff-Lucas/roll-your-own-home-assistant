@@ -1,9 +1,21 @@
 <script>
+  import { onMount } from 'svelte'
+  import { getVoiceStatus } from '../api.js'
   import { trackOverlay } from '../overlays.js'
   import { act, formatAlarmTime, ICONS, itemName, ringing } from './store.js'
 
   let busy = $state(false)
   let error = $state(null)
+  // Whether "stop" / "snooze" can be said instead of tapped (needs speech recognition).
+  let canSpeak = $state(false)
+
+  onMount(async () => {
+    try {
+      canSpeak = (await getVoiceStatus()).ring_commands === true
+    } catch {
+      // No hint if the status can't be read; the buttons still work.
+    }
+  })
 
   // A boolean, not the list: `ringing` gets a fresh array on every clock tick,
   // and this must only fire when something starts or stops ringing.
@@ -50,6 +62,7 @@
           </div>
         </div>
       {/each}
+      {#if canSpeak}<p class="hint">…or just say “stop” or “snooze”</p>{/if}
       {#if error}<p class="error">{error}</p>{/if}
     </div>
   </div>
@@ -129,6 +142,13 @@
   .error {
     color: #fecaca;
     text-align: center;
+  }
+
+  .hint {
+    color: #d1d5db;
+    text-align: center;
+    font-size: 1.2rem;
+    margin: 0;
   }
 
   /* Gentle, not a flash: this may go off in a dim room. */

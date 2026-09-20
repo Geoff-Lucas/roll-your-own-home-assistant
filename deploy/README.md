@@ -173,6 +173,18 @@ the weather (see `backend/app/voice/skills/`). Pieces, and how to set each up:
   `recent_peak_level` (loudest audio the mic heard in the last ~10 s) and
   `recent_peak_score` (how close the model got): a quick way to tell "the mic
   can't hear me" from "it heard me but didn't recognize the phrase".
+- **Saying "stop" while something rings.** While a timer or alarm is going
+  off you can just say "stop", "dismiss" or "snooze" (or "snooze for ten
+  minutes") — no wake word. The kiosk has no echo cancellation and can't listen
+  through its own chime, so the two take turns: chime, a beat for the echo to die
+  away, then a ~3 second listening window (`HOME_ORGANIZER_VOICE_RING_WINDOW_SECONDS`),
+  then the next chime. The microphone is only opened while something is ringing.
+  What counts is deliberately narrow: only a short (six words or fewer), explicit
+  stop/dismiss/snooze, so "okay", "thanks" or people talking can't silence an
+  alarm, and no other command is acted on without the wake word. Anything it
+  hears and ignores is kept in `GET /api/voice/history` (entries marked
+  `"via": "ringing"`) so false triggers can be diagnosed. Turn it off with
+  `HOME_ORGANIZER_VOICE_RING_LISTEN=false`.
 - **Changing the reply voice.** With espeak-ng: `HOME_ORGANIZER_VOICE_ESPEAK_VOICE`
   (e.g. `en-us+f3` for a woman's voice, `en-gb`, `en-us+m3`) and
   `HOME_ORGANIZER_VOICE_ESPEAK_SPEED` (words per minute, default 160). List the

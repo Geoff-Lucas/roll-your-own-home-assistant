@@ -62,6 +62,12 @@ class Settings(BaseSettings):
     # keeps the microphone open all the time (the audio is only ever compared
     # against the wake-word model and thrown away; nothing is recorded or
     # recognized until the phrase is heard).
+    # While a timer/alarm rings, listen between chimes for a short "stop" or
+    # "snooze" (no wake word needed). Only ever opens the microphone while
+    # something is ringing.
+    voice_ring_listen: bool = True
+    voice_ring_window_seconds: float = 3.0  # how long to listen after each chime
+    voice_ring_max_utterance_seconds: float = 5.0
     voice_wakeword_enabled: bool = False
     voice_wakeword_threshold: float = 0.5  # 0-1; lower = more sensitive, more false triggers
     voice_wakeword_cooldown_seconds: float = 2.0

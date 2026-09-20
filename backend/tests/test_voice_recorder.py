@@ -257,3 +257,26 @@ async def test_a_microphone_that_goes_silent_is_an_error_not_a_hang(arecord, mon
 
     with pytest.raises(MicUnavailable, match="isn't sending"):
         await recorder.Recorder().record(asyncio.Event(), lambda _l: None)
+
+
+@pytest.mark.anyio
+async def test_a_short_listening_window_gives_up_sooner_than_the_default(arecord):
+    # While an alarm rings, only a few seconds are spent listening for "stop".
+    process = FakeProcess([pcm_at(QUIET)] * 200)
+    arecord(process)
+
+    recording = await recorder.Recorder().record(asyncio.Event(), lambda _l: None, start_timeout=1.0)
+
+    assert recording.reason == "no_speech"
+    assert len(recording.pcm) <= chunks(1.0) * CHUNK_BYTES + CHUNK_BYTES  # ~1 second, not the default 6
+
+
+@pytest.mark.anyio
+async def test_the_utterance_limit_can_be_overridden_too(arecord):
+    process = FakeProcess([pcm_at(SPEECH)] * 400)
+    arecord(process)
+
+    recording = await recorder.Recorder().record(asyncio.Event(), lambda _l: None, max_seconds=2.0)
+
+    assert recording.reason == "max"
+    assert recording.seconds <= 2.3

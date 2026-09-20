@@ -26,6 +26,7 @@ from ..text import (
 
 _CANCEL = r"\b(cancel|delete|remove|clear|kill|get rid of|turn off|switch off|disable)\b"
 _ALL = r"\b(all|every|both|everything)\b"
+_STRICT_STOP = r"\b(stop|dismiss|silence|quiet|enough|shut up|turn (it )?off)\b"
 _ACK = r"\b(stop|dismiss|silence|quiet|enough|shut up|turn (it )?off|okay|ok|got it|thanks|thank you|that will do)\b"
 
 # Words that are part of *asking* for a timer rather than naming it.
@@ -66,17 +67,31 @@ def handle(t: str, ctx: Context) -> Optional[Reply]:
 # --- something is ringing ---------------------------------------------------
 
 
-def _ringing(t: str, ctx: Context, ringing: list[Timer]) -> Optional[Reply]:
+def _ringing(t: str, ctx: Context, ringing: list[Timer], strict: bool = False) -> Optional[Reply]:
+    """`strict` is for hands-free use, where nobody said the wake word first: only
+    the explicit words count, so a passing "okay" or "thanks" can't dismiss anything."""
     if _has(t, r"\bsnooze\b"):
         minutes = max(1, round((parse_duration(t) or 300) / 60))
         for item in ringing:
             service.snooze(ctx.session, item, minutes, now=ctx.now)
         return Reply(f"Snoozed for {spoken_duration(minutes * 60)}.")
-    if _has(t, _ACK) or _has(t, _CANCEL):
+    if _has(t, _STRICT_STOP) or (not strict and (_has(t, _ACK) or _has(t, _CANCEL))):
         for item in ringing:
             service.dismiss(ctx.session, item, now=ctx.now)
         return Reply("Okay.")
     return None
+
+
+# A hands-free dismissal is a short, deliberate word or two ("stop", "snooze for
+# ten minutes"). Anything longer is people talking, and is left alone.
+MAX_RING_COMMAND_WORDS = 6
+
+
+def handle_while_ringing(t: str, ctx: Context) -> Optional[Reply]:
+    ringing = [item for item in service.list_all(ctx.session) if item.state == "ringing"]
+    if not ringing or len(t.split()) > MAX_RING_COMMAND_WORDS:
+        return None
+    return _ringing(t, ctx, ringing, strict=True)
 
 
 # --- picking which one the person means ------------------------------------

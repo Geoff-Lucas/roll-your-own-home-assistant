@@ -21,6 +21,14 @@ SKILLS: tuple[Skill, ...] = (timers.handle, clock.handle, weather.handle)
 NOT_UNDERSTOOD = "Sorry, I don't know how to help with that yet."
 
 
+def route_while_ringing(utterance: str, ctx: Context) -> Optional[Reply]:
+    """The hands-free path while something rings: no wake word was said, so the
+    only thing listened for is a short, explicit "stop" or "snooze". Everything
+    else — including any other command — is deliberately ignored."""
+    text = numbers_to_digits(normalize(utterance))
+    return timers.handle_while_ringing(text, ctx) if text else None
+
+
 def route(utterance: str, ctx: Context) -> Reply:
     text = numbers_to_digits(normalize(utterance))
     if not text:

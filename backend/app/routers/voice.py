@@ -3,6 +3,7 @@ import shutil
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from ..config import settings
 from ..voice.session import VoiceBusy, voice
 from ..voice.tts import choose_speaker
 
@@ -25,6 +26,7 @@ def status() -> dict:
         "speech_recognition": {"ready": ready, "detail": detail},
         "speaker": speaker.name if speaker else None,
         "wake_word": voice.wake_status(),
+        "ring_commands": settings.voice_ring_listen and ready,
     }
 
 

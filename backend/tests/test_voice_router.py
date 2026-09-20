@@ -408,3 +408,95 @@ def test_what_time_is_my_alarm_is_an_alarm_question_not_the_clock(say):
     say("set an alarm for 7 am")
 
     assert say("what time is my alarm") == "Your alarm is set for 7 AM tomorrow."
+
+
+# --- hands-free dismissal (no wake word) -----------------------------------
+
+
+from app.voice.router import route_while_ringing  # noqa: E402
+
+
+@pytest.fixture
+def ring(session):
+    """Say something with no wake word, while `n` timers are ringing."""
+
+    def _ring(text, ringing=1, now=NOW):
+        for i in range(ringing):
+            service.create_timer(session, 1, f"t{i}", now=NOW)
+        service.tick(session, now=NOW + timedelta(seconds=5))
+        ctx = Context(session=session, now=now, tz=NEW_YORK, weather=WEATHER, location_name="Fairfax, VA")
+        reply = route_while_ringing(text, ctx)
+        return reply.text if reply else None
+
+    return _ring
+
+
+@pytest.mark.parametrize("said", ["stop", "Stop.", "dismiss", "silence", "quiet", "enough", "shut up", "turn it off", "turn off"])
+def test_an_explicit_stop_word_dismisses_whatever_is_ringing(ring, session, said):
+    assert ring(said) == "Okay."
+
+    assert timers_of(session) == []
+
+
+def test_stop_dismisses_everything_that_is_ringing(ring, session):
+    assert ring("stop", ringing=3) == "Okay."
+
+    assert timers_of(session) == []
+
+
+def test_snooze_by_voice_defaults_to_five_minutes_or_takes_a_length(ring, session):
+    later = NOW + timedelta(seconds=5)
+    assert ring("snooze", now=later) == "Snoozed for 5 minutes."
+    assert timers_of(session)[0].state == "running"
+
+
+def test_snooze_with_a_length(ring, session):
+    assert ring("snooze for ten minutes", now=NOW + timedelta(seconds=5)) == "Snoozed for 10 minutes."
+
+
+@pytest.mark.parametrize(
+    "said",
+    ["okay", "ok", "thanks", "thank you", "got it", "that will do", "cancel", "yes", "hello"],
+)
+def test_everyday_words_never_dismiss_anything_without_the_wake_word(ring, session, said):
+    # "okay" and "thanks" come up constantly in a kitchen; they must not silence a timer.
+    assert ring(said) is None
+
+    assert timers_of(session)[0].state == "ringing"
+
+
+def test_a_long_utterance_is_conversation_not_a_command(ring, session):
+    assert ring("we should stop by the store on the way home and pick up eggs") is None
+    assert timers_of(session)[0].state == "ringing"
+
+
+def test_the_length_limit_is_six_words(ring, session):
+    assert ring("please stop that noise right now") == "Okay."  # six words: allowed
+
+
+def test_seven_words_is_too_many(ring, session):
+    assert ring("please stop that noise right now thanks") is None
+
+
+@pytest.mark.parametrize("said", ["set a timer for ten minutes", "cancel all timers", "what time is it", "set an alarm for 7 am"])
+def test_other_commands_are_ignored_without_the_wake_word(ring, session, said):
+    # Overheard chatter must not be able to change your timers or alarms.
+    assert ring(said) is None
+
+    assert [(t.label, t.state) for t in timers_of(session)] == [("t0", "ringing")]  # nothing created or removed
+
+
+def test_nothing_happens_if_nothing_is_ringing(session):
+    ctx = Context(session=session, now=NOW, tz=NEW_YORK, weather=WEATHER, location_name=None)
+    service.create_timer(session, 600, "still running", now=NOW)
+
+    assert route_while_ringing("stop", ctx) is None
+    assert timers_of(session)[0].state == "running"
+
+
+def test_the_normal_route_keeps_its_more_forgiving_words(say, session):
+    # With the wake word said first ("Hey Jarvis, okay"), the lenient set still applies.
+    service.create_timer(session, 1, "t", now=NOW)
+    service.tick(session, now=NOW + timedelta(seconds=5))
+
+    assert say("okay", now=NOW + timedelta(seconds=5)) == "Okay."

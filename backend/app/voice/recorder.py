@@ -109,7 +109,17 @@ class Recording:
 
 
 class Recorder:
-    async def record(self, stop: asyncio.Event, on_level: Callable[[float], None]) -> Recording:
+    async def record(
+        self,
+        stop: asyncio.Event,
+        on_level: Callable[[float], None],
+        *,
+        start_timeout: Optional[float] = None,
+        max_seconds: Optional[float] = None,
+    ) -> Recording:
+        """Record one utterance. The two limits default to the settings; a caller
+        wanting a short listening window (e.g. for "stop" while an alarm rings)
+        passes its own."""
         command = [
             "arecord", "-q", "-D", settings.mic_device, "-f", "S16_LE", "-r", str(SAMPLE_RATE), "-c", "1", "-t", "raw",
         ]  # fmt: skip
@@ -122,8 +132,8 @@ class Recorder:
 
         detector = EndpointDetector(
             silence_seconds=settings.voice_silence_seconds,
-            start_timeout=settings.voice_start_timeout_seconds,
-            max_seconds=settings.voice_max_seconds,
+            start_timeout=settings.voice_start_timeout_seconds if start_timeout is None else start_timeout,
+            max_seconds=settings.voice_max_seconds if max_seconds is None else max_seconds,
         )
         chunks: list[bytes] = []
         reason = "stopped"

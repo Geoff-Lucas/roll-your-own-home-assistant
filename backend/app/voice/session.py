@@ -22,6 +22,7 @@ from ..time_utils import to_naive_utc
 from ..timers import service
 from ..weather import get_cached_weather
 from .core import Context, Reply
+from .mic import mic_lock
 from .recorder import MicUnavailable, Recorder
 from .router import route
 from .stt import SpeechRecognitionUnavailable, WhisperTranscriber
@@ -174,15 +175,16 @@ class VoiceSession:
 
     async def _listen(self, ack: bool = False) -> None:
         try:
-            if self.wake is not None:
-                await self.wake.pause()  # release the microphone
-            ready, why = self.transcriber.status()
-            if not ready:
-                self._finish(error=why)
-                return
-            if ack:
-                await self._ack()
-            recording = await self.recorder.record(self._stop, self._on_level)
+            async with mic_lock:  # held from taking the microphone to done recording
+                if self.wake is not None:
+                    await self.wake.pause()  # release the microphone
+                ready, why = self.transcriber.status()
+                if not ready:
+                    self._finish(error=why)
+                    return
+                if ack:
+                    await self._ack()
+                recording = await self.recorder.record(self._stop, self._on_level)
             if not recording.usable:
                 self._finish(error="I didn't hear anything.")
                 return
