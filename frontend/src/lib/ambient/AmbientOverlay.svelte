@@ -3,7 +3,7 @@
   import { getAmbientPhotos, getAmbientStatus } from '../api.js'
   import { wake } from './idle.js'
 
-  const PHOTO_INTERVAL_MS = 15_000
+  const PHOTO_INTERVAL_MS = 60_000
   const MOTION_POLL_MS = 5_000
 
   let photos = $state([])
