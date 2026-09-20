@@ -43,35 +43,37 @@
 <main class="app">
   <header class="topbar">
     <WeatherWidget />
-    <div class="legend">
-      {#each accounts as account (account.id)}
-        <span class="legend-item">
-          <span class="dot" style="background-color: {account.color}"></span>
-          {account.person_name}
-        </span>
-      {/each}
-      {#if loadError}
-        <span class="error">Couldn't load accounts: {loadError}</span>
+    <div class="people-row">
+      <div class="legend">
+        {#each accounts as account (account.id)}
+          <span class="legend-item">
+            <span class="dot" style="background-color: {account.color}"></span>
+            {account.person_name}
+          </span>
+        {/each}
+        {#if loadError}
+          <span class="error">Couldn't load accounts: {loadError}</span>
+        {/if}
+      </div>
+      {#if people.length > 0}
+        <label class="acting-as">
+          Acting as
+          <select bind:value={$currentPerson}>
+            {#each people as person (person)}
+              <option value={person}>{person}</option>
+            {/each}
+          </select>
+        </label>
       {/if}
+      <nav class="tabs">
+        <button type="button" class:active={activeView === 'calendar'} onclick={() => (activeView = 'calendar')}>
+          Calendar
+        </button>
+        <button type="button" class:active={activeView === 'recipes'} onclick={() => (activeView = 'recipes')}>
+          Recipes
+        </button>
+      </nav>
     </div>
-    <nav class="tabs">
-      <button type="button" class:active={activeView === 'calendar'} onclick={() => (activeView = 'calendar')}>
-        Calendar
-      </button>
-      <button type="button" class:active={activeView === 'recipes'} onclick={() => (activeView = 'recipes')}>
-        Recipes
-      </button>
-    </nav>
-    {#if people.length > 0}
-      <label class="acting-as">
-        Acting as
-        <select bind:value={$currentPerson}>
-          {#each people as person (person)}
-            <option value={person}>{person}</option>
-          {/each}
-        </select>
-      </label>
-    {/if}
   </header>
   <section class="content-area">
     {#if activeView === 'calendar'}
@@ -108,12 +110,19 @@
 
   .topbar {
     display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    gap: 2rem;
+    flex-direction: column;
+    gap: 0.6rem;
     padding: 0.75rem 1.25rem;
     flex-shrink: 0;
+  }
+
+  /* People color legend, the "acting as" selector right beside it, and the
+     view tabs pinned to the far right (they don't fit beside the weather). */
+  .people-row {
+    display: flex;
+    align-items: center;
     flex-wrap: wrap;
+    gap: 0.5rem 2rem;
   }
 
   .legend {
@@ -144,6 +153,7 @@
   .tabs {
     display: flex;
     gap: 0.5rem;
+    margin-left: auto;
   }
 
   .tabs button {
@@ -166,7 +176,6 @@
     align-items: center;
     gap: 0.5rem;
     font-size: 1rem;
-    margin-left: auto;
   }
 
   .acting-as select {

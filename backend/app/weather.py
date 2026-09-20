@@ -59,6 +59,7 @@ async def _fetch_weather() -> dict:
         "longitude": settings.weather_longitude,
         "current": "temperature_2m,weather_code",
         "daily": "temperature_2m_max,temperature_2m_min,weather_code",
+        "hourly": "temperature_2m,weather_code,precipitation_probability",
         "temperature_unit": settings.weather_temperature_unit,
         "timezone": "auto",
         "forecast_days": 5,
@@ -67,6 +68,39 @@ async def _fetch_weather() -> dict:
         response = await client.get("https://api.open-meteo.com/v1/forecast", params=params)
         response.raise_for_status()
         return response.json()
+
+
+# How many upcoming hours to hand the frontend. Much more than it displays on
+# purpose: the backend only refreshes every 30 min, so the frontend picks the
+# hours that are still "next" relative to the current time itself.
+_HOURLY_LOOKAHEAD = 24
+
+
+def _upcoming_hours(raw: dict) -> list:
+    hourly = raw.get("hourly")
+    if not hourly:
+        return []
+    # Open-Meteo returns times as naive local-to-the-location ISO strings
+    # (we ask for timezone=auto), e.g. "2026-09-20T10:00" — same format as
+    # current.time, so plain string comparison orders them correctly.
+    now = raw["current"].get("time", "")
+    rain_chance = hourly.get("precipitation_probability") or []
+    hours = []
+    for i, time in enumerate(hourly["time"]):
+        if time <= now:
+            continue
+        icon, _ = describe_weather_code(hourly["weather_code"][i])
+        hours.append(
+            {
+                "time": time,
+                "temperature": hourly["temperature_2m"][i],
+                "icon": icon,
+                "precipitation_probability": rain_chance[i] if i < len(rain_chance) else None,
+            }
+        )
+        if len(hours) == _HOURLY_LOOKAHEAD:
+            break
+    return hours
 
 
 def _to_widget_shape(raw: dict) -> dict:
@@ -91,6 +125,7 @@ def _to_widget_shape(raw: dict) -> dict:
             "description": current_description,
         },
         "forecast": forecast,
+        "hourly": _upcoming_hours(raw),
         "unit": raw["current_units"]["temperature_2m"],
     }
 
