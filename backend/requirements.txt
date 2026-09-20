@@ -19,3 +19,5 @@ faster-whisper>=1.1
 # Pinned: 0.5+ requires tflite-runtime, which has no build for Python 3.13. 0.4.0 bundles
 # the hey_jarvis model and runs on onnxruntime alone.
 openwakeword==0.4.0
+# Natural-sounding reply voice (optional at runtime: without a voice file, espeak-ng is used).
+piper-tts>=1.3

@@ -156,9 +156,23 @@ the weather (see `backend/app/voice/skills/`). Pieces, and how to set each up:
   in `requirements.txt`.
 - **Voice for replies.** `sudo apt install -y espeak-ng` gives a robotic but
   zero-setup voice, used automatically. A natural-sounding **Piper** voice is
-  used instead if `HOME_ORGANIZER_VOICE_PIPER_BINARY` and
-  `HOME_ORGANIZER_VOICE_PIPER_MODEL` point at an installed Piper. Replies are
-  played through `HOME_ORGANIZER_AUDIO_DEVICE` (see Audio above).
+  used instead once one is chosen. Piper itself is the `piper-tts` pip package
+  (in `requirements.txt`, found automatically beside the app's Python); a
+  voice is a separate download, about 60 MB for a medium one, fetched by a
+  command you run:
+
+  ```bash
+  cd ~/home_organizer/backend
+  .venv/bin/python -m app.voice.setup --piper en_US-amy-medium   # lands in data/voice/piper
+  echo 'HOME_ORGANIZER_VOICE_PIPER_MODEL=en_US-amy-medium' >> .env && sudo systemctl restart home-organizer
+  ```
+
+  `HOME_ORGANIZER_VOICE_PIPER_MODEL` is the voice's name (or a path to a
+  `.onnx` file). Browse voices, with audio samples, at
+  <https://rhasspy.github.io/piper-samples/>. `GET /api/voice/status` shows
+  `"speaker": "piper"` when it is in use. Each reply takes about 2 s to render
+  on this mini PC, on top of the speaker's start-up delay. Replies are played
+  through `HOME_ORGANIZER_AUDIO_DEVICE` (see Audio above).
 - **Hands-free "Hey Jarvis".** Set `HOME_ORGANIZER_VOICE_WAKEWORD_ENABLED=true`
   and restart. A background listener keeps the microphone open and feeds it,
   80 ms at a time, to a small local model (openWakeWord's `hey_jarvis`, about
@@ -189,7 +203,8 @@ the weather (see `backend/app/voice/skills/`). Pieces, and how to set each up:
   (e.g. `en-us+f3` for a woman's voice, `en-gb`, `en-us+m3`) and
   `HOME_ORGANIZER_VOICE_ESPEAK_SPEED` (words per minute, default 160). List the
   options with `espeak-ng --voices=en`. Natural-sounding voices need Piper (see
-  above).
+  above). Of the two US voices tried on the kiosk's monitor speakers, `amy`
+  sounded clearer than `lessac`, which reverberated more.
 - **Checking it.** `curl http://127.0.0.1:8000/api/voice/status` says what is
   missing. Everything after speech recognition can be tried without a
   microphone: `curl -X POST http://127.0.0.1:8000/api/voice/text -H "Content-Type: application/json" -d '{"text":"what time is it"}'`

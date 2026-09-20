@@ -53,8 +53,11 @@ class Settings(BaseSettings):
     # List them with `espeak-ng --voices=en`; variants are in espeak-ng-data/voices/!v.
     voice_espeak_voice: str = "en-us"
     voice_espeak_speed: int = 160
-    voice_piper_binary: str = ""  # path to the piper executable
-    voice_piper_model: str = ""  # path to a piper voice (.onnx)
+    # Piper: blank binary = the `piper` installed beside this app's Python (pip install
+    # piper-tts). The voice is a name ("en_US-lessac-medium", looked up in data/voice/piper;
+    # fetch one with `python -m app.voice.setup --piper NAME`) or a path to a .onnx file.
+    voice_piper_binary: str = ""
+    voice_piper_model: str = ""
     voice_silence_seconds: float = 1.1  # quiet this long after speech = finished
     voice_start_timeout_seconds: float = 6.0  # give up if nothing is said
     voice_max_seconds: float = 15.0
@@ -75,6 +78,10 @@ class Settings(BaseSettings):
     @property
     def voice_models_dir(self) -> Path:
         return self.data_dir / "voice" / "models"
+
+    @property
+    def voice_piper_dir(self) -> Path:
+        return self.data_dir / "voice" / "piper"
 
     # Browser tab (see app/browser/) — a second, real Chromium window the
     # backend places under the app's header and steers over the DevTools

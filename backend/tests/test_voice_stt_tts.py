@@ -230,10 +230,71 @@ async def test_a_failed_render_is_an_error_not_silence(monkeypatch):
         await tts.EspeakSpeaker().speak("hello")
 
 
+@pytest.fixture
+def piper_files(tmp_path, monkeypatch):
+    """A fake piper executable and voice on disk, with the settings pointing at them."""
+    binary = tmp_path / "piper"
+    binary.write_bytes(b"")
+    voices = tmp_path / "voices"
+    voices.mkdir()
+    (voices / "en_US-lessac-medium.onnx").write_bytes(b"")
+    monkeypatch.setattr(tts.settings, "voice_piper_binary", str(binary))
+    monkeypatch.setattr(tts.settings, "voice_piper_model", "en_US-lessac-medium")
+    monkeypatch.setattr(type(tts.settings), "voice_piper_dir", property(lambda self: voices))
+    return binary, voices
+
+
+def test_a_voice_is_found_by_name_in_the_piper_folder(piper_files):
+    _, voices = piper_files
+
+    assert tts.piper_model() == voices / "en_US-lessac-medium.onnx"
+    assert tts.piper_available() is True
+
+
+def test_a_voice_can_be_a_path_instead(piper_files, tmp_path, monkeypatch):
+    elsewhere = tmp_path / "other.onnx"
+    elsewhere.write_bytes(b"")
+    monkeypatch.setattr(tts.settings, "voice_piper_model", str(elsewhere))
+
+    assert tts.piper_model() == elsewhere
+
+
+def test_piper_is_unavailable_without_a_chosen_or_present_voice(piper_files, monkeypatch):
+    monkeypatch.setattr(tts.settings, "voice_piper_model", "")
+    assert tts.piper_model() is None and tts.piper_available() is False
+
+    monkeypatch.setattr(tts.settings, "voice_piper_model", "en_GB-not-downloaded")
+    assert tts.piper_model() is None and tts.piper_available() is False
+
+
+def test_piper_is_unavailable_when_the_configured_program_is_missing(piper_files, tmp_path, monkeypatch):
+    monkeypatch.setattr(tts.settings, "voice_piper_binary", str(tmp_path / "nope"))
+
+    assert tts.piper_binary() is None and tts.piper_available() is False
+
+
+def test_the_piper_program_is_found_beside_the_apps_python_by_default(piper_files, tmp_path, monkeypatch):
+    bin_dir = tmp_path / "venv-bin"
+    bin_dir.mkdir()
+    program = bin_dir / ("piper.exe" if tts.os.name == "nt" else "piper")
+    program.write_bytes(b"")
+    monkeypatch.setattr(tts.settings, "voice_piper_binary", "")
+    monkeypatch.setattr(tts.sys, "executable", str(bin_dir / "python"))
+
+    assert tts.piper_binary() == program
+
+
 @pytest.mark.anyio
-async def test_piper_is_given_the_text_on_stdin(monkeypatch):
-    monkeypatch.setattr(tts.settings, "voice_piper_binary", "/opt/piper/piper")
-    monkeypatch.setattr(tts.settings, "voice_piper_model", "/opt/piper/voice.onnx")
+async def test_speaking_with_piper_but_no_voice_is_an_error(piper_files, monkeypatch):
+    monkeypatch.setattr(tts.settings, "voice_piper_model", "en_GB-not-downloaded")
+
+    with pytest.raises(tts.SpeechError, match="voice file is missing"):
+        await tts.PiperSpeaker().speak("hello")
+
+
+@pytest.mark.anyio
+async def test_piper_is_given_the_text_on_stdin(piper_files, monkeypatch):
+    binary, voices = piper_files
     seen = {}
 
     async def fake_run(*command, stdin=None):
@@ -249,5 +310,35 @@ async def test_piper_is_given_the_text_on_stdin(monkeypatch):
 
     await tts.PiperSpeaker().speak("Timer set for 10 minutes.")
 
-    assert seen["command"][:3] == ("/opt/piper/piper", "--model", "/opt/piper/voice.onnx")
+    assert seen["command"][:3] == (str(binary), "--model", str(voices / "en_US-lessac-medium.onnx"))
     assert seen["stdin"] == b"Timer set for 10 minutes."
+
+
+def test_setup_downloads_a_named_piper_voice(monkeypatch, tmp_path, capsys):
+    from app.voice import setup
+
+    monkeypatch.setattr(type(setup.settings), "voice_piper_dir", property(lambda self: tmp_path / "piper"))
+    calls = []
+
+    class Done:
+        returncode = 0
+
+    monkeypatch.setattr(setup.subprocess, "run", lambda command: calls.append(command) or Done())
+
+    assert setup.main(["--piper", "en_US-amy-medium"]) == 0
+
+    (command,) = calls
+    assert command[1:4] == ["-m", "piper.download_voices", "en_US-amy-medium"]
+    assert command[-1] == str(tmp_path / "piper")
+    assert "HOME_ORGANIZER_VOICE_PIPER_MODEL=en_US-amy-medium" in capsys.readouterr().out
+
+
+def test_setup_does_not_download_a_voice_it_already_has(monkeypatch, tmp_path):
+    from app.voice import setup
+
+    (tmp_path / "piper").mkdir()
+    (tmp_path / "piper" / "en_US-amy-medium.onnx").write_bytes(b"")
+    monkeypatch.setattr(type(setup.settings), "voice_piper_dir", property(lambda self: tmp_path / "piper"))
+    monkeypatch.setattr(setup.subprocess, "run", lambda command: pytest.fail("should not download"))
+
+    assert setup.main(["--piper", "en_US-amy-medium"]) == 0
