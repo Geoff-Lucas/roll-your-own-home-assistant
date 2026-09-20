@@ -150,3 +150,26 @@ export function browserReload() {
 export function importCurrentPage() {
   return request('/browser/import-current', { method: 'POST' })
 }
+
+export function getTimers() {
+  return request('/timers')
+}
+
+export function createTimer(payload) {
+  return requestJson('/timers', 'POST', payload)
+}
+
+// action: pause | resume | reset | dismiss  (snooze takes { minutes })
+export function timerAction(id, action, body) {
+  return body
+    ? requestJson(`/timers/${id}/${action}`, 'POST', body)
+    : request(`/timers/${id}/${action}`, { method: 'POST' })
+}
+
+export function deleteTimer(id) {
+  return request(`/timers/${id}`, { method: 'DELETE' })
+}
+
+export function testChime() {
+  return request('/timers/test-chime', { method: 'POST' })
+}

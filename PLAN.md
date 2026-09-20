@@ -118,6 +118,11 @@ Tiered, cheapest/lightest first — appropriate for 4GB RAM with cloud access as
 3. **Intent handling — rule-based first, LLM fallback:** match common commands ("add an event," "what's for dinner," "read today's calendar") with simple rule/regex matching — fast, free, no round trip. Fall back to the Claude API for open-ended queries the rules don't cover.
 4. **Text-to-speech — local:** Piper TTS, purpose-built for edge devices, light enough for the Pi 4, no need to send responses to the cloud.
 
+**Update (Sept 2026, after the move to the mini PC):**
+- The tier choices above were made for a 4GB Pi. On the Ryzen 5 / 16GB machine, **local speech-to-text (faster-whisper) is viable** — worth doing instead of cloud STT, so voice never leaves the house and only the *text* of a question reaches the Claude API. For the wake word, prefer **openWakeWord** (open source, no vendor key) over Porcupine.
+- **Hardware:** a USB microphone is attached and works. Speaker output is the monitor's HDMI speakers via a raw ALSA device (`plughw:0,3`) because the AMD driver reports no HDMI audio sink — see `deploy/README.md` "Audio". All sound goes through `app/audio/player.py` so timer chimes and spoken replies share one path.
+- **Build order for voice:** commands are plain functions usable by tap first, voice second. Done: **timers, alarms, stopwatch** (`app/timers/`, server-side so alarms ring regardless of what the screen is showing). Next: tap-to-talk loop (mic → local STT → command matching → TTS + on-screen text), then weather/time/calendar-read/meal-plan/conversion commands, then wake word, then the Claude fallback (Q&A, meal planning), then calendar adds by voice (always read back for confirmation), recipe search, cook-mode, shopping list.
+
 ## Security & credentials
 
 - Backend stays LAN-only — no port-forwarding, no public internet exposure. Better yet: since the kiosk browser runs on the same Pi, bind the backend to `127.0.0.1` until remote/phone access is actually wanted — then the "unauthenticated API" question doesn't exist yet. When it does open to the LAN, note that anyone on the home WiFi (including guests) could read/modify data; a simple shared token for the frontend is enough at that point.

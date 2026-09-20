@@ -106,6 +106,31 @@ pointer events here. Adjust `MatchProduct` to your controller's name
 `xinput set-prop <id> "libinput Calibration Matrix" 0 -1 1 1 0 0 0 0 1`
 (all nine values are required).
 
+### Audio (timer chimes now, voice replies later)
+
+Sound goes through **one configurable ALSA device**, `HOME_ORGANIZER_AUDIO_DEVICE`
+in `backend/.env` (used with `aplay -D`; default `"default"`). On `h-asst` that
+is the monitor's own speakers over HDMI, with a catch worth knowing about:
+
+- The monitor (PX275h) advertises audio in its EDID, but the AMD graphics driver
+  reports **no monitor on any HDMI audio pin** (`/proc/asound/card0/eld#*` all
+  say `monitor_present 0`). PulseAudio therefore marks every HDMI output
+  "not available" and only offers a dummy sink, so the default device is silent.
+- The raw ALSA device still plays: `plughw:0,3` reached the speakers (waking the
+  controller or re-probing it did not change the ELD report, so this is a
+  driver quirk to live with, not something the app can fix).
+- To find the right output on another machine, play something distinct on each
+  HDMI device and listen — e.g. `aplay -D plughw:0,3 x.wav`, then `0,7`, `0,8`
+  (list them with `aplay -l`). Then set it in `.env`:
+
+  ```
+  HOME_ORGANIZER_AUDIO_DEVICE=plughw:0,3
+  ```
+
+Check it from the kiosk with `curl -X POST http://127.0.0.1:8000/api/timers/test-chime`
+(plays the timer chime once). The USB microphone needs no setup — it is
+PulseAudio's default input.
+
 ## 3. Get the code onto the machine
 
 For the very first deploy, clone directly on the machine:

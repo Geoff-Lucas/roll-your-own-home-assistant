@@ -6,6 +6,9 @@
   import MealPlanner from './lib/MealPlanner.svelte'
   import WeatherWidget from './lib/WeatherWidget.svelte'
   import BrowserView from './lib/BrowserView.svelte'
+  import TimerChips from './lib/timers/TimerChips.svelte'
+  import RingingOverlay from './lib/timers/RingingOverlay.svelte'
+  import { startTimers } from './lib/timers/store.js'
   import LocationBadge from './lib/LocationBadge.svelte'
   import VirtualKeyboard from './lib/keyboard/VirtualKeyboard.svelte'
   import AmbientOverlay from './lib/ambient/AmbientOverlay.svelte'
@@ -30,6 +33,7 @@
 
   onMount(async () => {
     hideBrowser().catch(() => {})
+    startTimers()
 
     try {
       accounts = await getAccounts()
@@ -78,6 +82,7 @@
           </select>
         </label>
       {/if}
+      <TimerChips />
       <nav class="tabs">
         <button type="button" class:active={activeView === 'calendar'} onclick={() => (activeView = 'calendar')}>
           Calendar
@@ -115,6 +120,8 @@
 {/if}
 
 <DimOverlay />
+
+<RingingOverlay />
 
 <VirtualKeyboard />
 

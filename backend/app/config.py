@@ -32,6 +32,14 @@ class Settings(BaseSettings):
     weather_temperature_unit: str = "fahrenheit"  # or "celsius"
     weather_poll_interval_seconds: int = 1800
 
+    # Timers, alarms and stopwatches (see app/timers/) and the audio they use.
+    # audio_device is an ALSA device name for `aplay -D`; "default" follows the
+    # system's default sink. IANA zone name for alarms; blank = the machine's own.
+    audio_device: str = "default"
+    timezone: str = ""
+    timer_ring_repeat_seconds: float = 2.5  # gap between chimes while something is ringing
+    timer_ring_max_seconds: int = 300  # stop chiming (but keep showing the alert) after this long
+
     # Browser tab (see app/browser/) — a second, real Chromium window the
     # backend places under the app's header and steers over the DevTools
     # protocol. Only meaningful on the kiosk itself (needs a display, chromium,

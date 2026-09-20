@@ -23,9 +23,11 @@ from .routers import (
     meal_plan,
     recipes,
     reminders,
+    timers,
     weather,
 )
 from .sync.worker import run_sync_loop
+from .timers.alerts import run_timer_loop
 from .weather import run_weather_loop
 
 
@@ -35,7 +37,11 @@ async def lifespan(app: FastAPI):
     with Session(engine) as session:
         seed_default_location(session)
     start_motion_sensor()  # no-ops with a logged warning if there's no GPIO hardware
-    background_tasks = [asyncio.create_task(run_sync_loop()), asyncio.create_task(run_weather_loop())]
+    background_tasks = [
+        asyncio.create_task(run_sync_loop()),
+        asyncio.create_task(run_weather_loop()),
+        asyncio.create_task(run_timer_loop()),
+    ]
     yield
     await browser_controller.shutdown()
     for task in background_tasks:
@@ -70,6 +76,7 @@ app.include_router(recipes.router, prefix="/api")
 app.include_router(weather.router, prefix="/api")
 app.include_router(locations.router, prefix="/api")
 app.include_router(browser.router, prefix="/api")
+app.include_router(timers.router, prefix="/api")
 app.include_router(ambient.router, prefix="/api")
 app.include_router(reminders.router, prefix="/api")
 app.include_router(meal_plan.router, prefix="/api")

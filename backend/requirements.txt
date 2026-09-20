@@ -14,3 +14,4 @@ google-auth>=2.30
 google-auth-oauthlib>=1.2
 requests>=2.31
 websockets>=12
+tzlocal>=5.0
