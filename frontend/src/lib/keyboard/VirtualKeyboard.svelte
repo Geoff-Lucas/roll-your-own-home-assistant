@@ -32,7 +32,13 @@
       shiftLayout = !shiftLayout
       keyboard.setOptions({ layoutName: shiftLayout ? 'shift' : 'default' })
     } else if (button === '{enter}') {
-      $activeField?.blur()
+      const field = $activeField
+      // Opt-in (data-submit-on-done): a field like the browser address bar
+      // wants "done" to submit, since this keyboard can't send a real Enter.
+      if (field?.dataset.submitOnDone !== undefined) {
+        field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
+      }
+      field?.blur()
     }
   }
 

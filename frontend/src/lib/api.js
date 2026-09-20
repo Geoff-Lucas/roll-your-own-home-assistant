@@ -118,3 +118,35 @@ export function getMealPlan() {
 export function setMealPlan(planDate, recipeId) {
   return requestJson(`/meal-plan/${planDate}`, 'PUT', { recipe_id: recipeId })
 }
+
+export function getBrowserState() {
+  return request('/browser/state')
+}
+
+export function showBrowser(rect) {
+  return requestJson('/browser/show', 'POST', rect)
+}
+
+export function hideBrowser() {
+  return request('/browser/hide', { method: 'POST' })
+}
+
+export function navigateBrowser(address) {
+  return requestJson('/browser/navigate', 'POST', { address })
+}
+
+export function browserBack() {
+  return request('/browser/back', { method: 'POST' })
+}
+
+export function browserForward() {
+  return request('/browser/forward', { method: 'POST' })
+}
+
+export function browserReload() {
+  return request('/browser/reload', { method: 'POST' })
+}
+
+export function importCurrentPage() {
+  return request('/browser/import-current', { method: 'POST' })
+}

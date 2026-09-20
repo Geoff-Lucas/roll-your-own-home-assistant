@@ -47,8 +47,10 @@ SSH in (`ssh <user>@h-asst.local`) and do the one-time base setup:
 ```bash
 sudo apt update && sudo apt full-upgrade -y
 sudo apt install -y python3-venv python3-dev build-essential \
-  chromium git rsync curl unclutter
+  chromium git rsync curl unclutter xdotool wmctrl
 ```
+
+(`xdotool` and `wmctrl` are what the Browser tab uses to place its window.)
 
 Set up auto-login so the machine boots straight into the desktop with no
 password prompt, via a drop-in file `/etc/lightdm/lightdm.conf.d/50-autologin.conf`
@@ -154,6 +156,11 @@ sudo systemctl status home-organizer   # confirm it's active
 curl http://127.0.0.1:8000/api/health  # confirm it's answering
 ```
 
+Already installed before the Browser tab existed? Re-run the `sed … | sudo tee` line
+above and `sudo systemctl daemon-reload && sudo systemctl restart home-organizer`:
+the unit now sets `DISPLAY` and keeps `/usr/bin` on `PATH`, which the Browser
+tab needs.
+
 ## 5. Kiosk autostart
 
 Register the kiosk launcher as an XFCE autostart application:
@@ -177,6 +184,36 @@ delete `~/.config/autostart/home-organizer-kiosk.desktop`.
 If it doesn't come up: check `sudo systemctl status home-organizer` first
 (most failures are the backend not running, not the browser), then
 `~/.xsession-errors`.
+
+### The Browser tab
+
+The **Browser** tab in the header shows a real web browser under the toolbar,
+for looking up recipes. It is **not** an embedded frame — sites such as Google,
+Allrecipes and NYT Cooking refuse to be framed, and a framed page's address
+can't be read by the app. Instead the backend launches a second Chromium
+(profile in `backend/data/browser-profile/`, so logins persist — keep it out of
+backups), lays it over the page area as a frameless always-on-top window, and
+steers it over the DevTools protocol (bound to `127.0.0.1` only). The toolbar's
+address field takes URLs *or* search terms (anything that isn't a URL becomes a
+Google search), and **Add to recipes** reads the page's URL from the browser and
+runs it through the recipe importer. Typing *inside* web pages needs a physical
+keyboard — the on-screen keyboard only works in the app's own fields.
+
+Three things make the layering work, all handled by `deploy/kiosk.sh`:
+
+- The app window is full-screen-sized and frameless but **not** in the window
+  manager's fullscreen state. A focused fullscreen window is drawn above every
+  other window — including always-on-top ones — so a tap on the header would
+  otherwise bury the browser.
+- The browser window is created with `--kiosk` (Chromium draws no frame in
+  kiosk mode; a normal or `--app` window gets a title bar that can't be
+  removed), then taken out of fullscreen and placed with `wmctrl`.
+- The XFCE panels are quit on login, since without fullscreen protection they
+  would pop up over the header when a screen edge is touched.
+
+While the Browser tab is open the photo carousel is suspended (touches inside
+the browser window aren't visible to the app), and the overnight dimming does
+not apply to the browser window.
 
 ### Headless alternative
 

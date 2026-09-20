@@ -8,12 +8,14 @@ from fastapi.staticfiles import StaticFiles
 from sqlmodel import Session
 
 from .ambient.motion import start_motion_sensor
+from .browser.controller import controller as browser_controller
 from .config import settings
 from .db import engine, init_db
 from .locations import seed_default_location
 from .routers import (
     accounts,
     ambient,
+    browser,
     events,
     google_oauth,
     health,
@@ -35,6 +37,7 @@ async def lifespan(app: FastAPI):
     start_motion_sensor()  # no-ops with a logged warning if there's no GPIO hardware
     background_tasks = [asyncio.create_task(run_sync_loop()), asyncio.create_task(run_weather_loop())]
     yield
+    await browser_controller.shutdown()
     for task in background_tasks:
         task.cancel()
     for task in background_tasks:
@@ -66,6 +69,7 @@ app.include_router(events.router, prefix="/api")
 app.include_router(recipes.router, prefix="/api")
 app.include_router(weather.router, prefix="/api")
 app.include_router(locations.router, prefix="/api")
+app.include_router(browser.router, prefix="/api")
 app.include_router(ambient.router, prefix="/api")
 app.include_router(reminders.router, prefix="/api")
 app.include_router(meal_plan.router, prefix="/api")

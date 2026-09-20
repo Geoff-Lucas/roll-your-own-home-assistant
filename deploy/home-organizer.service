@@ -9,7 +9,11 @@ Type=simple
 # different clone location.
 User=pi
 WorkingDirectory=/home/pi/home_organizer/backend
-Environment=PATH=/home/pi/home_organizer/backend/.venv/bin
+# System directories stay on PATH: the Browser tab launches chromium and drives
+# it with xdotool/wmctrl, all of which live in /usr/bin.
+Environment=PATH=/home/pi/home_organizer/backend/.venv/bin:/usr/local/bin:/usr/bin:/bin
+# The X display the kiosk runs on — needed to open and place the browser window.
+Environment=DISPLAY=:0
 EnvironmentFile=-/home/pi/home_organizer/backend/.env
 ExecStart=/home/pi/home_organizer/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
 Restart=on-failure

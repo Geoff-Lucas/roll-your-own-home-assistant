@@ -32,6 +32,21 @@ class Settings(BaseSettings):
     weather_temperature_unit: str = "fahrenheit"  # or "celsius"
     weather_poll_interval_seconds: int = 1800
 
+    # Browser tab (see app/browser/) — a second, real Chromium window the
+    # backend places under the app's header and steers over the DevTools
+    # protocol. Only meaningful on the kiosk itself (needs a display, chromium,
+    # xdotool and wmctrl); everywhere else the endpoints report 503.
+    browser_command: str = "chromium"
+    browser_display: str = ":0"
+    browser_debug_port: int = 9222
+    browser_home_url: str = "https://www.google.com/"
+
+    @property
+    def browser_profile_dir(self) -> Path:
+        # Persistent so logins/cookies survive restarts (e.g. staying signed in
+        # to a search or chat site). Contains cookies — keep it out of backups.
+        return self.data_dir / "browser-profile"
+
     @property
     def database_path(self) -> Path:
         return self.data_dir / self.database_filename

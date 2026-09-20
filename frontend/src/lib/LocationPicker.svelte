@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte'
   import { vkbd } from './keyboard/vkbd.js'
+  import { trackOverlay } from './overlays.js'
   import { addLocation, deleteLocation, getLocations, searchLocations, selectLocation } from './api.js'
 
   let { onClose, onChanged } = $props()
@@ -24,7 +25,11 @@
     }
   }
 
-  onMount(loadSaved)
+  // While open, the Browser tab's separate window must get out of the way.
+  onMount(() => {
+    loadSaved()
+    return trackOverlay()
+  })
 
   async function runSearch() {
     const text = query.trim()

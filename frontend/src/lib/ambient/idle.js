@@ -1,13 +1,21 @@
-import { writable } from 'svelte/store'
+import { get, writable } from 'svelte/store'
 
 export const isIdle = writable(false)
+
+// While true the dashboard never goes idle. The Browser tab sets this: touches
+// inside the separate browser window aren't seen by this page, so a person
+// reading a recipe there would otherwise be cut off by the photo carousel.
+export const idleSuspended = writable(false)
 
 let timeoutMs = 300_000
 let timer
 
 function resetTimer() {
   clearTimeout(timer)
-  timer = setTimeout(() => isIdle.set(true), timeoutMs)
+  timer = setTimeout(() => {
+    if (get(idleSuspended)) resetTimer()
+    else isIdle.set(true)
+  }, timeoutMs)
 }
 
 export function configureIdleTimeout(seconds) {

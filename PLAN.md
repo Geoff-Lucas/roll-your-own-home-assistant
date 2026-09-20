@@ -129,6 +129,8 @@ Tiered, cheapest/lightest first — appropriate for 4GB RAM with cloud access as
 - Nightly job (systemd timer or cron) copies the SQLite DB — and recipe/carousel images if practical — to the NAS. Off-device backup, since this becomes the household's calendar and recipe box and losing it is a real cost.
 - Test the restore path once before relying on it — a backup that's never been restored is a hope, not a backup. Use SQLite's `.backup` command (or `VACUUM INTO`), not a raw file copy of a live DB, to avoid copying a mid-write snapshot.
 
+- **Exclude `backend/data/browser-profile/`** from backups: it's the Browser tab's Chromium profile (cookies, and any logins made in it) — regenerable and better not copied to the NAS.
+
 ## Schema migrations
 
 - `SQLModel.metadata.create_all` only creates missing tables — it never alters existing ones. That's fine while developing (just recreate the dev DB), but **adopt Alembic before the first real household data lands on the Pi**, so later model changes (and there will be many — recurrence fields are already queued) don't force a wipe-and-relink of everyone's accounts.

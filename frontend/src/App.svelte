@@ -5,13 +5,14 @@
   import RemindersList from './lib/RemindersList.svelte'
   import MealPlanner from './lib/MealPlanner.svelte'
   import WeatherWidget from './lib/WeatherWidget.svelte'
+  import BrowserView from './lib/BrowserView.svelte'
   import LocationBadge from './lib/LocationBadge.svelte'
   import VirtualKeyboard from './lib/keyboard/VirtualKeyboard.svelte'
   import AmbientOverlay from './lib/ambient/AmbientOverlay.svelte'
   import DimOverlay from './lib/ambient/DimOverlay.svelte'
-  import { isIdle, startIdleWatcher, configureIdleTimeout } from './lib/ambient/idle.js'
+  import { isIdle, idleSuspended, startIdleWatcher, configureIdleTimeout } from './lib/ambient/idle.js'
   import { currentPerson } from './lib/currentPerson.js'
-  import { getAccounts, getAmbientConfig } from './lib/api.js'
+  import { getAccounts, getAmbientConfig, hideBrowser } from './lib/api.js'
 
   let accounts = $state([])
   let loadError = $state(null)
@@ -21,7 +22,15 @@
   // for the same person) can share a person_name.
   const people = $derived([...new Set(accounts.map((a) => a.person_name))])
 
+  // The Browser tab's window is a separate OS window that outlives this page:
+  // after a reload it could still be sitting on top of the app, so put it away.
+  $effect(() => {
+    idleSuspended.set(activeView === 'browser')
+  })
+
   onMount(async () => {
+    hideBrowser().catch(() => {})
+
     try {
       accounts = await getAccounts()
       if (accounts.length > 0) {
@@ -76,6 +85,9 @@
         <button type="button" class:active={activeView === 'recipes'} onclick={() => (activeView = 'recipes')}>
           Recipes
         </button>
+        <button type="button" class:active={activeView === 'browser'} onclick={() => (activeView = 'browser')}>
+          Browser
+        </button>
       </nav>
     </div>
   </header>
@@ -90,8 +102,10 @@
           <MealPlanner />
         </div>
       </div>
-    {:else}
+    {:else if activeView === 'recipes'}
       <RecipeList />
+    {:else}
+      <BrowserView onOpenRecipes={() => (activeView = 'recipes')} />
     {/if}
   </section>
 </main>
