@@ -95,6 +95,75 @@ def test_hourly_tolerates_missing_precipitation_data():
     assert all(h["precipitation_probability"] is None for h in shaped["hourly"])
 
 
+def test_shape_carries_the_utc_offset_for_non_local_locations():
+    raw = _raw_with_hourly()
+    raw["utc_offset_seconds"] = -25200  # e.g. Denver in summer
+
+    assert weather._to_widget_shape(raw)["utc_offset_seconds"] == -25200
+
+
+def test_shape_defaults_the_utc_offset_when_absent():
+    assert weather._to_widget_shape(_raw_with_hourly())["utc_offset_seconds"] == 0
+
+
+@pytest.mark.anyio
+async def test_switch_location_never_leaves_the_previous_places_weather_behind(monkeypatch):
+    # If the fetch for the newly selected place fails, the cache must be empty
+    # (widget shows "unavailable"), not still holding the old place's weather
+    # under the new place's name.
+    async def failing_fetch():
+        raise RuntimeError("network down")
+
+    weather._cache["data"] = {"current": {"temperature": 70.0}}
+    monkeypatch.setattr(weather, "_fetch_weather", failing_fetch)
+
+    await weather.switch_location()
+
+    assert weather.get_cached_weather() is None
+
+
+@pytest.mark.anyio
+async def test_switch_location_populates_fresh_weather_on_success(monkeypatch):
+    async def fake_fetch():
+        return _raw_with_hourly()
+
+    weather._cache["data"] = {"current": {"temperature": 70.0}}
+    monkeypatch.setattr(weather, "_fetch_weather", fake_fetch)
+
+    await weather.switch_location()
+
+    assert weather.get_cached_weather()["current"]["temperature"] == 62.0
+
+
+def test_current_coordinates_follow_the_selected_location(monkeypatch):
+    from sqlalchemy.pool import StaticPool
+    from sqlmodel import Session, SQLModel, create_engine
+
+    from app.models import Location
+
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    SQLModel.metadata.create_all(engine)
+    with Session(engine) as session:
+        session.add(Location(name="Denver", latitude=39.74, longitude=-104.99))
+        session.commit()
+    monkeypatch.setattr(weather, "engine", engine)
+
+    assert weather._current_coordinates() == (39.74, -104.99)
+
+
+def test_current_coordinates_fall_back_to_config_when_no_location_exists(monkeypatch):
+    from sqlalchemy.pool import StaticPool
+    from sqlmodel import SQLModel, create_engine
+
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    SQLModel.metadata.create_all(engine)
+    monkeypatch.setattr(weather, "engine", engine)
+    monkeypatch.setattr(weather.settings, "weather_latitude", 1.5)
+    monkeypatch.setattr(weather.settings, "weather_longitude", 2.5)
+
+    assert weather._current_coordinates() == (1.5, 2.5)
+
+
 def test_shape_without_hourly_data_still_works():
     # Older cached/mocked responses have no "hourly" key at all.
     raw = _raw_with_hourly()

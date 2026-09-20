@@ -19,12 +19,16 @@ class Settings(BaseSettings):
     sync_window_past_days: int = 30
     sync_window_future_days: int = 365
 
-    # Weather (see app/weather.py) — the device doesn't move, so location is
-    # configured once rather than detected. Defaults are a placeholder
-    # (New York City); set HOME_ORGANIZER_WEATHER_LATITUDE/LONGITUDE for the
-    # actual install location.
+    # Weather (see app/weather.py). The location shown is chosen at runtime
+    # from the on-screen picker (see app/locations.py); these three only seed
+    # the very first entry when no location has ever been selected. Defaults
+    # are a placeholder (New York City) — set HOME_ORGANIZER_WEATHER_LATITUDE/
+    # LONGITUDE/LOCATION_NAME for the actual install location.
     weather_latitude: float = 40.7128
     weather_longitude: float = -74.0060
+    weather_location_name: str = "Home"
+    # Saved locations not selected for this long are deleted (never the current one).
+    location_retention_days: int = 365
     weather_temperature_unit: str = "fahrenheit"  # or "celsius"
     weather_poll_interval_seconds: int = 1800
 

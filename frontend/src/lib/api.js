@@ -48,6 +48,26 @@ export function getWeather() {
   return request('/weather')
 }
 
+export function getLocations() {
+  return request('/locations')
+}
+
+export function searchLocations(query) {
+  return request(`/locations/search?${new URLSearchParams({ q: query })}`)
+}
+
+export function addLocation(candidate) {
+  return requestJson('/locations', 'POST', candidate)
+}
+
+export function selectLocation(id) {
+  return request(`/locations/${id}/select`, { method: 'POST' })
+}
+
+export function deleteLocation(id) {
+  return request(`/locations/${id}`, { method: 'DELETE' })
+}
+
 export function getRecipes() {
   return request('/recipes')
 }

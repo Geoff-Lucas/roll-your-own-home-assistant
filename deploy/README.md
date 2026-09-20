@@ -117,7 +117,13 @@ cp .env.example .env
 ```
 
 Edit `.env` — at minimum set `HOME_ORGANIZER_WEATHER_LATITUDE`/`_LONGITUDE`
-for your actual location.
+and `HOME_ORGANIZER_WEATHER_LOCATION_NAME` (e.g. `"Fairfax, VA"`) for your
+actual location. These only **seed the first entry**: after that the weather
+location is chosen from the on-screen picker (tap the location at the top
+right), which keeps recently used places for quick reselection and deletes
+any not picked for a year (`HOME_ORGANIZER_LOCATION_RETENTION_DAYS`, default
+365; the location currently showing is never deleted). Changing these env
+values later has no effect once a location exists.
 
 **Existing accounts do not carry over.** Neither the SQLite DB
 (`backend/data/`, excluded from rsync) nor the encryption key

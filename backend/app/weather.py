@@ -4,8 +4,11 @@ from datetime import datetime, timezone
 from typing import Dict, Optional, Tuple
 
 import httpx
+from sqlmodel import Session
 
 from .config import settings
+from .db import engine
+from .locations import get_current_location, purge_stale_locations
 
 logger = logging.getLogger(__name__)
 
@@ -53,10 +56,22 @@ def describe_weather_code(code: int) -> Tuple[str, str]:
 _cache: Dict[str, Optional[object]] = {"data": None, "fetched_at": None}
 
 
+def _current_coordinates() -> Tuple[float, float]:
+    """Where to fetch weather for: the location most recently picked on
+    screen. Falls back to the configured seed values if the table is empty
+    (e.g. a request racing the very first startup)."""
+    with Session(engine) as session:
+        location = get_current_location(session)
+    if location is not None:
+        return location.latitude, location.longitude
+    return settings.weather_latitude, settings.weather_longitude
+
+
 async def _fetch_weather() -> dict:
+    latitude, longitude = _current_coordinates()
     params = {
-        "latitude": settings.weather_latitude,
-        "longitude": settings.weather_longitude,
+        "latitude": latitude,
+        "longitude": longitude,
         "current": "temperature_2m,weather_code",
         "daily": "temperature_2m_max,temperature_2m_min,weather_code",
         "hourly": "temperature_2m,weather_code,precipitation_probability",
@@ -126,6 +141,10 @@ def _to_widget_shape(raw: dict) -> dict:
         },
         "forecast": forecast,
         "hourly": _upcoming_hours(raw),
+        # Hourly times are local to the forecast location, which is no longer
+        # necessarily where this device is — the frontend needs the offset
+        # to know which of them are still in the future.
+        "utc_offset_seconds": raw.get("utc_offset_seconds", 0),
         "unit": raw["current_units"]["temperature_2m"],
     }
 
@@ -146,7 +165,35 @@ def get_cached_weather() -> Optional[dict]:
     return _cache["data"]
 
 
+async def switch_location() -> None:
+    """Called right after a different location is picked. The cache is
+    cleared first so a failed fetch can never leave the *previous* place's
+    weather on screen under the new place's name — better to show "weather
+    unavailable" until the (fast) retry succeeds."""
+    _cache["data"] = None
+    await refresh_weather_cache()
+
+
+# After a failed fetch there is nothing cached to fall back on (startup, or
+# just after switching location), so retry soon instead of waiting out a full
+# 30-minute cycle.
+_RETRY_WHEN_EMPTY_SECONDS = 60
+
+
+def _purge_stale_locations() -> None:
+    try:
+        with Session(engine) as session:
+            removed = purge_stale_locations(session)
+        if removed:
+            logger.info("Removed %d saved location(s) not selected within the retention window", removed)
+    except Exception:
+        logger.exception("Purging stale locations failed")
+
+
 async def run_weather_loop() -> None:
     while True:
         await refresh_weather_cache()
-        await asyncio.sleep(settings.weather_poll_interval_seconds)
+        _purge_stale_locations()
+        await asyncio.sleep(
+            settings.weather_poll_interval_seconds if _cache["data"] is not None else _RETRY_WHEN_EMPTY_SECONDS
+        )

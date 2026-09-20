@@ -5,11 +5,24 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from sqlmodel import Session
 
 from .ambient.motion import start_motion_sensor
 from .config import settings
-from .db import init_db
-from .routers import accounts, ambient, events, google_oauth, health, meal_plan, recipes, reminders, weather
+from .db import engine, init_db
+from .locations import seed_default_location
+from .routers import (
+    accounts,
+    ambient,
+    events,
+    google_oauth,
+    health,
+    locations,
+    meal_plan,
+    recipes,
+    reminders,
+    weather,
+)
 from .sync.worker import run_sync_loop
 from .weather import run_weather_loop
 
@@ -17,6 +30,8 @@ from .weather import run_weather_loop
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    with Session(engine) as session:
+        seed_default_location(session)
     start_motion_sensor()  # no-ops with a logged warning if there's no GPIO hardware
     background_tasks = [asyncio.create_task(run_sync_loop()), asyncio.create_task(run_weather_loop())]
     yield
@@ -50,6 +65,7 @@ app.include_router(accounts.router, prefix="/api")
 app.include_router(events.router, prefix="/api")
 app.include_router(recipes.router, prefix="/api")
 app.include_router(weather.router, prefix="/api")
+app.include_router(locations.router, prefix="/api")
 app.include_router(ambient.router, prefix="/api")
 app.include_router(reminders.router, prefix="/api")
 app.include_router(meal_plan.router, prefix="/api")

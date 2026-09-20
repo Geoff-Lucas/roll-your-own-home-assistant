@@ -1,6 +1,7 @@
 <script>
   import { onDestroy, onMount } from 'svelte'
   import { getWeather } from './api.js'
+  import { locationVersion } from './weatherLocation.js'
 
   // Refetch on a much shorter cycle than the backend's own refresh
   // (app/weather.py polls Open-Meteo every 30 min by default) — this just
@@ -8,7 +9,7 @@
   // provider itself.
   const REFRESH_INTERVAL_MS = 5 * 60_000
 
-  const HOURS_SHOWN = 6
+  const HOURS_SHOWN = 5
   // Only call out rain when it's a real possibility — a "5%" on every hour is noise.
   const RAIN_CHANCE_SHOWN_AT = 30
   // The hourly list is cached for up to 30 min, so re-evaluate which hours are
@@ -32,11 +33,18 @@
   let now = $state(Date.now())
   let refreshTimer
   let clockTimer
+  let unsubscribeLocation
 
-  // Hourly times are local to the forecast location, which is also where this
-  // device sits, so parsing them as local times is correct.
+  // Hourly times are naive and local to the *forecast location* — which, now
+  // that the location is selectable, isn't necessarily where this device is.
+  // Reading them as UTC and subtracting the location's UTC offset gives the
+  // real instant, so "is this hour still upcoming?" is right for any place.
+  function hourInstant(timeStr) {
+    return Date.parse(`${timeStr}Z`) - (weather?.utc_offset_seconds ?? 0) * 1000
+  }
+
   const upcomingHours = $derived(
-    (weather?.hourly ?? []).filter((hour) => new Date(hour.time).getTime() > now).slice(0, HOURS_SHOWN),
+    (weather?.hourly ?? []).filter((hour) => hourInstant(hour.time) > now).slice(0, HOURS_SHOWN),
   )
 
   async function load() {
@@ -56,19 +64,27 @@
     return new Date(`${dateStr}T00:00:00`).toLocaleDateString(undefined, { weekday: 'short' })
   }
 
+  // The label should read as the location's own clock time, so format the
+  // naive string as-if-UTC and display it in UTC (no zone shifting).
   function formatHour(timeStr) {
-    return new Date(timeStr).toLocaleTimeString(undefined, { hour: 'numeric' })
+    return new Date(`${timeStr}Z`).toLocaleTimeString(undefined, { hour: 'numeric', timeZone: 'UTC' })
   }
 
   onMount(() => {
     load()
     refreshTimer = setInterval(load, REFRESH_INTERVAL_MS)
     clockTimer = setInterval(() => (now = Date.now()), CLOCK_TICK_MS)
+    // A store subscription fires once immediately with the initial value (0);
+    // only a real change (> 0) should trigger the extra refetch.
+    unsubscribeLocation = locationVersion.subscribe((version) => {
+      if (version > 0) load()
+    })
   })
 
   onDestroy(() => {
     clearInterval(refreshTimer)
     clearInterval(clockTimer)
+    unsubscribeLocation?.()
   })
 </script>
 

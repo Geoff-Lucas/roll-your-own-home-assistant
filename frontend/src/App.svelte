@@ -5,6 +5,7 @@
   import RemindersList from './lib/RemindersList.svelte'
   import MealPlanner from './lib/MealPlanner.svelte'
   import WeatherWidget from './lib/WeatherWidget.svelte'
+  import LocationBadge from './lib/LocationBadge.svelte'
   import VirtualKeyboard from './lib/keyboard/VirtualKeyboard.svelte'
   import AmbientOverlay from './lib/ambient/AmbientOverlay.svelte'
   import DimOverlay from './lib/ambient/DimOverlay.svelte'
@@ -42,7 +43,10 @@
 
 <main class="app">
   <header class="topbar">
-    <WeatherWidget />
+    <div class="top-row">
+      <WeatherWidget />
+      <LocationBadge />
+    </div>
     <div class="people-row">
       <div class="legend">
         {#each accounts as account (account.id)}
@@ -114,6 +118,14 @@
     gap: 0.6rem;
     padding: 0.75rem 1.25rem;
     flex-shrink: 0;
+  }
+
+  /* Weather, then the location badge (with its own divider) on the right. */
+  .top-row {
+    display: flex;
+    align-items: stretch;
+    justify-content: space-between;
+    gap: 1.25rem;
   }
 
   /* People color legend, the "acting as" selector right beside it, and the
