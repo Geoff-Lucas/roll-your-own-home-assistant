@@ -13,11 +13,15 @@ done
 # lands on a screen edge. (Bring them back for maintenance: `xfce4-panel &`.)
 xfce4-panel --quit 2>/dev/null
 
-# Never blank the screen. X's default blanks it after 10 idle minutes, which drops
-# the HDMI signal: the monitor sleeps and its speakers go silent with it, so the
-# wake word and alarms would be unseen and unheard. (The app can wake a sleeping
-# screen, see app/display.py, so to let it sleep again just remove this line.)
+# Never blank the screen. Two independent X mechanisms can do it — the screen
+# saver AND DPMS (power management) — so both need turning off, or the display
+# still standbys after DPMS's own 10-minute timer even with the screen saver
+# disabled. Blanking drops the HDMI signal: the monitor sleeps and its speakers
+# go silent with it, so the wake word and alarms would be unseen and unheard.
+# (The app can wake a sleeping screen, see app/display.py, so to let it sleep
+# again just remove these two lines.)
 xset s off
+xset -dpms
 
 # --password-store=basic: without it Chromium asks the system keyring for a
 # password store, and on an auto-login session the keyring is locked, so an
