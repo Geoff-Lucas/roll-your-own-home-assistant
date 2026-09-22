@@ -1,0 +1,83 @@
+<svg viewBox="0 0 900 1600" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fbeecb"/>
+      <stop offset="45%" stop-color="#f7dfb0"/>
+      <stop offset="100%" stop-color="#eec98a"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="12%" r="60%">
+      <stop offset="0%" stop-color="#fff6e0" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#fff6e0" stop-opacity="0"/>
+    </radialGradient>
+    <!-- One maple-leaf outline, reused at different sizes/colors/rotations below. -->
+    <path id="leaf" d="M0,-46 C10,-30 34,-26 30,-6 C44,-8 54,6 44,18
+      C54,22 56,38 42,40 C46,54 34,62 22,54 C20,66 4,70 0,58
+      C-4,70 -20,66 -22,54 C-34,62 -46,54 -42,40 C-56,38 -54,22 -44,18
+      C-54,6 -44,-8 -30,-6 C-34,-26 -10,-30 0,-46 Z M0,-40 L0,50" stroke-width="2.5" fill-rule="evenodd"/>
+  </defs>
+
+  <rect width="900" height="1600" fill="url(#sky)"/>
+  <rect width="900" height="1600" fill="url(#glow)"/>
+
+  <!-- soft out-of-focus color washes for depth -->
+  <circle cx="120" cy="220" r="260" fill="#c0392b" opacity="0.10"/>
+  <circle cx="780" cy="520" r="300" fill="#d4831f" opacity="0.10"/>
+  <circle cx="180" cy="1120" r="320" fill="#8a4a2a" opacity="0.10"/>
+  <circle cx="760" cy="1420" r="280" fill="#c0392b" opacity="0.09"/>
+  <circle cx="500" cy="820" r="360" fill="#e0a730" opacity="0.07"/>
+
+  <!-- a bare branch, upper corner -->
+  <g stroke="#6b4226" stroke-width="6" stroke-linecap="round" fill="none" opacity="0.5">
+    <path d="M900,40 C 760,90 660,60 560,150"/>
+    <path d="M760,70 C 730,110 700,120 665,160"/>
+    <path d="M660,110 C 630,90 610,70 600,40"/>
+  </g>
+
+  <!-- leaves, scattered loosely in a diagonal drift from upper-right to lower-left -->
+  <g fill="#c0392b" stroke="#8e2a1e" opacity="0.85">
+    <use href="#leaf" transform="translate(660,140) rotate(25) scale(0.9)"/>
+  </g>
+  <g fill="#e0812c" stroke="#a85a16" opacity="0.85">
+    <use href="#leaf" transform="translate(760,260) rotate(-15) scale(0.7)"/>
+  </g>
+  <g fill="#d4a017" stroke="#a67c13" opacity="0.8">
+    <use href="#leaf" transform="translate(560,340) rotate(60) scale(0.6)"/>
+  </g>
+  <g fill="#a1522b" stroke="#733a1e" opacity="0.85">
+    <use href="#leaf" transform="translate(300,480) rotate(-40) scale(1.0)"/>
+  </g>
+  <g fill="#c0392b" stroke="#8e2a1e" opacity="0.8">
+    <use href="#leaf" transform="translate(130,620) rotate(20) scale(0.65)"/>
+  </g>
+  <g fill="#e0812c" stroke="#a85a16" opacity="0.8">
+    <use href="#leaf" transform="translate(720,700) rotate(80) scale(0.55)"/>
+  </g>
+  <g fill="#d4a017" stroke="#a67c13" opacity="0.75">
+    <use href="#leaf" transform="translate(60,860) rotate(-30) scale(0.8)"/>
+  </g>
+  <g fill="#a1522b" stroke="#733a1e" opacity="0.8">
+    <use href="#leaf" transform="translate(450,940) rotate(45) scale(0.6)"/>
+  </g>
+  <g fill="#c0392b" stroke="#8e2a1e" opacity="0.8">
+    <use href="#leaf" transform="translate(800,1020) rotate(-60) scale(0.7)"/>
+  </g>
+  <g fill="#e0812c" stroke="#a85a16" opacity="0.85">
+    <use href="#leaf" transform="translate(220,1140) rotate(15) scale(0.9)"/>
+  </g>
+  <g fill="#d4a017" stroke="#a67c13" opacity="0.8">
+    <use href="#leaf" transform="translate(640,1220) rotate(-25) scale(0.6)"/>
+  </g>
+  <g fill="#a1522b" stroke="#733a1e" opacity="0.8">
+    <use href="#leaf" transform="translate(100,1340) rotate(50) scale(0.75)"/>
+  </g>
+  <g fill="#c0392b" stroke="#8e2a1e" opacity="0.85">
+    <use href="#leaf" transform="translate(760,1420) rotate(10) scale(0.65)"/>
+  </g>
+  <g fill="#e0812c" stroke="#a85a16" opacity="0.8">
+    <use href="#leaf" transform="translate(400,1500) rotate(-50) scale(0.55)"/>
+  </g>
+
+  <!-- ground-level rolling hill, hinted at the very bottom -->
+  <path d="M0,1600 L0,1540 C 200,1490 300,1560 480,1520 C 660,1480 760,1540 900,1500 L900,1600 Z"
+        fill="#8a5a2c" opacity="0.16"/>
+</svg>

@@ -58,6 +58,8 @@
   })
 </script>
 
+<div class="fall-background" aria-hidden="true"></div>
+
 <main class="app">
   <header class="topbar">
     <div class="top-row">
@@ -133,6 +135,18 @@
 <VirtualKeyboard />
 
 <style>
+  /* A seasonal backdrop, faint enough to stay out of the way of text sitting
+     directly on it (the header's weather/location, the calendar grid) — the
+     cards elsewhere (recipes, reminders, meal plan) are opaque over it anyway. */
+  .fall-background {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background: url('/fall-background.svg') center / cover no-repeat;
+    opacity: 0.35;
+    pointer-events: none;
+  }
+
   .app {
     display: flex;
     flex-direction: column;

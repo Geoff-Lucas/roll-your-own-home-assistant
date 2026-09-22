@@ -1,5 +1,8 @@
 :root {
-  color-scheme: light dark;
+  /* The rest of the app (cards, buttons, text) is styled for a light
+     background only, with no dark-mode counterparts, so pin it — an OS/browser
+     dark preference would otherwise mismatch the fall backdrop and cards below. */
+  color-scheme: light;
   /* Base size is bumped up from a typical desktop default (18px) — this
      runs on a 27" 2K portrait kiosk display, not a monitor read from arm's
      length, so there's plenty of room to size up for readability. */
@@ -17,4 +20,8 @@ body,
   margin: 0;
   padding: 0;
   overflow: hidden; /* kiosk display — nothing here should scroll the whole page */
+}
+
+body {
+  background: #fdf6e8; /* shows at the fall backdrop's edges if it doesn't quite cover */
 }
