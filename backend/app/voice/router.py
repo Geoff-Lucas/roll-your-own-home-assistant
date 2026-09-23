@@ -2,21 +2,24 @@
 
 Rule-based on purpose: for the everyday commands (timers, the time, the
 weather) matching is instant, free and predictable. Anything the rules don't
-recognize is where a language-model fallback will plug in later — see the
-"Voice assistant" section of PLAN.md.
+recognize falls through to claude_fallback, an optional (off by default)
+language-model fallback — see the "Voice assistant" section of PLAN.md.
 """
 
 from typing import Callable, Optional
 
 from .core import Context, Reply
-from .skills import clock, timers, weather
+from .skills import claude_fallback, clock, timers, weather
 from .text import normalize, numbers_to_digits
 
 Skill = Callable[[str, Context], Optional[Reply]]
 
 # Order matters where phrasings overlap: "what time is my alarm" belongs to
-# timers, not the clock, so timers are asked first.
-SKILLS: tuple[Skill, ...] = (timers.handle, clock.handle, weather.handle)
+# timers, not the clock, so timers are asked first. claude_fallback goes last:
+# it "declines" (returns None) exactly like the others when a command isn't
+# its kind of thing — here, whenever it isn't turned on — so with it off,
+# nothing below changes.
+SKILLS: tuple[Skill, ...] = (timers.handle, clock.handle, weather.handle, claude_fallback.handle)
 
 NOT_UNDERSTOOD = "Sorry, I don't know how to help with that yet."
 

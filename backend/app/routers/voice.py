@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 from ..config import settings
 from ..voice.session import VoiceBusy, voice
+from ..voice.skills.claude_fallback import available as claude_available
 from ..voice.tts import choose_speaker
 
 router = APIRouter(prefix="/voice", tags=["voice"])
@@ -27,6 +28,7 @@ def status() -> dict:
         "speaker": speaker.name if speaker else None,
         "wake_word": voice.wake_status(),
         "ring_commands": settings.voice_ring_listen and ready,
+        "claude_fallback": claude_available(),
     }
 
 

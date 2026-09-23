@@ -21,3 +21,6 @@ faster-whisper>=1.1
 openwakeword==0.4.0
 # Natural-sounding reply voice (optional at runtime: without a voice file, espeak-ng is used).
 piper-tts>=1.3
+# Claude API fallback for open-ended voice questions (optional at runtime: off
+# unless HOME_ORGANIZER_VOICE_CLAUDE_ENABLED and an API key are both set).
+anthropic>=0.40

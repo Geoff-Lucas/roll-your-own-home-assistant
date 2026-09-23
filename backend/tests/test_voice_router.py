@@ -500,3 +500,34 @@ def test_the_normal_route_keeps_its_more_forgiving_words(say, session):
     service.tick(session, now=NOW + timedelta(seconds=5))
 
     assert say("okay", now=NOW + timedelta(seconds=5)) == "Okay."
+
+
+# --- the Claude fallback, reached only for what nothing above understands ---
+
+
+def test_something_no_skill_understands_reaches_claude_when_its_turned_on(say, monkeypatch):
+    from app.voice.skills import claude_fallback
+
+    monkeypatch.setattr(claude_fallback.settings, "voice_claude_enabled", True)
+    monkeypatch.setattr(claude_fallback.settings, "voice_claude_api_key", "sk-test-key")
+    monkeypatch.setattr(claude_fallback, "_call_claude", lambda system, text: "Plain yogurt works well.")
+
+    assert say("what's a good buttermilk substitute") == "Plain yogurt works well."
+
+
+def test_a_command_a_skill_already_handles_never_reaches_claude(say, session, monkeypatch):
+    from app.voice.skills import claude_fallback
+
+    monkeypatch.setattr(claude_fallback.settings, "voice_claude_enabled", True)
+    monkeypatch.setattr(claude_fallback.settings, "voice_claude_api_key", "sk-test-key")
+    monkeypatch.setattr(claude_fallback, "_call_claude", lambda system, text: pytest.fail("should not be called"))
+
+    assert say("what time is it") != "Plain yogurt works well."
+
+
+def test_left_off_by_default_nothing_about_routing_changes():
+    # Off unless both HOME_ORGANIZER_VOICE_CLAUDE_ENABLED and an API key are set —
+    # the same NOT_UNDERSTOOD as before anything about Claude existed.
+    from app.voice.skills import claude_fallback
+
+    assert claude_fallback.settings.voice_claude_enabled is False

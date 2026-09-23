@@ -226,6 +226,28 @@ the weather (see `backend/app/voice/skills/`). Pieces, and how to set each up:
   missing. Everything after speech recognition can be tried without a
   microphone: `curl -X POST http://127.0.0.1:8000/api/voice/text -H "Content-Type: application/json" -d '{"text":"what time is it"}'`
   runs the command and speaks the reply.
+- **Claude API fallback for open-ended questions.** Timers, the clock and the
+  weather are answered locally by rule-based matching (see
+  `app/voice/router.py`); anything else ("what's a good substitute for
+  buttermilk?") gets `"Sorry, I don't know how to help with that yet."` unless
+  this is turned on. **Off by default, and the one place anything voice-related
+  leaves the house** — the *text* of the question (never audio) goes to
+  Anthropic's Messages API, along with today's date/time, the cached weather
+  and the current location for grounding. To turn it on:
+
+  ```
+  HOME_ORGANIZER_VOICE_CLAUDE_ENABLED=true
+  HOME_ORGANIZER_VOICE_CLAUDE_API_KEY=sk-ant-...
+  ```
+
+  `HOME_ORGANIZER_VOICE_CLAUDE_MODEL` picks the model (default
+  `claude-sonnet-5`; `claude-haiku-4-5-20251001` answers faster and is cheaper,
+  worth it if the reply's latency matters more than its polish — this is a
+  kiosk reply, not a chat). Replies are capped short (one or two spoken
+  sentences) and there's no conversation memory yet — every question is
+  answered on its own; follow-ups ("what about tomorrow?") aren't understood
+  as continuations. `GET /api/voice/status` shows `"claude_fallback": true`
+  once both settings are in place.
 
 ## 3. Get the code onto the machine
 

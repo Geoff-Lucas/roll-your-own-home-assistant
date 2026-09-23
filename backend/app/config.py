@@ -77,6 +77,15 @@ class Settings(BaseSettings):
     voice_wakeword_enabled: bool = False
     voice_wakeword_threshold: float = 0.5  # 0-1; lower = more sensitive, more false triggers
     voice_wakeword_cooldown_seconds: float = 2.0
+    # Claude API fallback for open-ended questions the rules above don't cover
+    # (see app/voice/skills/claude_fallback.py). Off by default: this is the one
+    # place voice leaves the house, as text only, and only once both this and
+    # the API key are set. claude-haiku-4-5 answers fast enough for a spoken
+    # reply; claude-sonnet-5 is better for anything that needs real reasoning.
+    voice_claude_enabled: bool = False
+    voice_claude_api_key: str = ""
+    voice_claude_model: str = "claude-sonnet-5"
+    voice_claude_timeout_seconds: float = 10.0
 
     @property
     def voice_models_dir(self) -> Path:

@@ -129,3 +129,14 @@ def test_status_explains_what_is_missing(setup, monkeypatch):
     assert "python -m app.voice.setup" in body["speech_recognition"]["detail"]
     assert body["speaker"] is None
     assert body["wake_word"] == {"enabled": True, "listening": True, "phrase": "Hey Jarvis"}
+    assert body["claude_fallback"] is False  # off unless explicitly turned on — see test below
+
+
+def test_status_reports_the_claude_fallback(setup, monkeypatch):
+    client, _ = setup
+
+    monkeypatch.setattr(voice_module, "claude_available", lambda: True)
+    assert client.get("/voice/status").json()["claude_fallback"] is True
+
+    monkeypatch.setattr(voice_module, "claude_available", lambda: False)
+    assert client.get("/voice/status").json()["claude_fallback"] is False
