@@ -25,6 +25,7 @@ from .routers import (
     meal_plan,
     recipes,
     reminders,
+    system,
     timers,
     voice,
     weather,
@@ -109,6 +110,7 @@ app.include_router(ambient.router, prefix="/api")
 app.include_router(reminders.router, prefix="/api")
 app.include_router(meal_plan.router, prefix="/api")
 app.include_router(google_oauth.router, prefix="/api")
+app.include_router(system.router, prefix="/api")
 
 # Locally-downloaded recipe images (see app/recipes/images.py) — served
 # directly rather than through a router since it's just static bytes.

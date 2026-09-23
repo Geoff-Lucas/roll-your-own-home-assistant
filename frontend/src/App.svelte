@@ -18,11 +18,12 @@
   import DimOverlay from './lib/ambient/DimOverlay.svelte'
   import { isIdle, idleSuspended, startIdleWatcher, configureIdleTimeout } from './lib/ambient/idle.js'
   import { currentPerson } from './lib/currentPerson.js'
-  import { getAccounts, getAmbientConfig, hideBrowser } from './lib/api.js'
+  import { getAccounts, getAmbientConfig, hideBrowser, minimizeToDesktop } from './lib/api.js'
 
   let accounts = $state([])
   let loadError = $state(null)
   let activeView = $state('calendar')
+  let minimizeError = $state(null)
 
   // Household members, deduplicated — several accounts (e.g. two calendars
   // for the same person) can share a person_name.
@@ -56,6 +57,19 @@
     }
     startIdleWatcher()
   })
+
+  // Steps out to the XFCE desktop underneath (see deploy/README.md "Minimizing
+  // to the desktop" for how to get back — there's no taskbar to click on a kiosk).
+  // Only works on the kiosk itself (needs a display and xdotool); elsewhere the
+  // backend reports 503, which is the one failure worth telling anyone about.
+  async function minimizeToDesktopClicked() {
+    minimizeError = null
+    try {
+      await minimizeToDesktop()
+    } catch (err) {
+      minimizeError = err.message
+    }
+  }
 </script>
 
 <div class="fall-background" aria-hidden="true"></div>
@@ -101,6 +115,10 @@
           Browser
         </button>
       </nav>
+      <button type="button" class="minimize" aria-label="Minimize to the desktop" onclick={minimizeToDesktopClicked}>
+        🖥️ Desktop
+      </button>
+      {#if minimizeError}<span class="error">{minimizeError}</span>{/if}
     </div>
   </header>
   <section class="content-area">
@@ -223,6 +241,21 @@
     background: #1f2937;
     color: white;
     border-color: #1f2937;
+  }
+
+  /* Deliberately plain, not part of the tab group it sits beside — this steps
+     out of the app entirely rather than switching to another view of it.
+     margin-left: auto keeps it pinned to the right edge even if it wraps to
+     its own line below the tabs on a narrow header (both are the same rule
+     the tabs use to reach the right edge of *their* line). */
+  .minimize {
+    margin-left: auto;
+    font-size: 1rem;
+    padding: 0.4rem 1rem;
+    border-radius: 0.4rem;
+    border: 1px solid #ccc;
+    background: none;
+    cursor: pointer;
   }
 
   .acting-as {

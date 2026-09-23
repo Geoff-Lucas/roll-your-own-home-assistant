@@ -193,3 +193,7 @@ export function stopVoice() {
 export function sendVoiceText(text, speak = true) {
   return requestJson('/voice/text', 'POST', { text, speak })
 }
+
+export function minimizeToDesktop() {
+  return request('/system/minimize', { method: 'POST' })
+}

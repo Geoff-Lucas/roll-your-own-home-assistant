@@ -23,6 +23,37 @@ xfce4-panel --quit 2>/dev/null
 xset s off
 xset -dpms
 
+# A "🖥️ Desktop" button in the app (see app/system.py) minimizes it to look at
+# the desktop underneath; since there's no taskbar on a kiosk to click to bring
+# it back, install a desktop icon that does (deploy/return-to-kiosk.sh).
+# Rewritten every login so an updated script or icon always takes effect.
+kiosk_dir=$(cd "$(dirname "$0")" && pwd)
+mkdir -p "$HOME/Desktop"
+chmod +x "$kiosk_dir/return-to-kiosk.sh"
+cat > "$HOME/Desktop/home-organizer.desktop" <<EOF
+[Desktop Entry]
+Type=Application
+Name=Home Organizer
+Comment=Return to the kiosk app
+Exec=$kiosk_dir/return-to-kiosk.sh
+Icon=video-display
+Terminal=false
+StartupNotify=false
+EOF
+chmod +x "$HOME/Desktop/home-organizer.desktop"
+# Two things XFCE checks before it will run a desktop-file launcher without
+# asking (verified on this machine): metadata::trusted, and a checksum of the
+# file's own bytes that must match right now — so it has to be set fresh every
+# time the file's content changes, which is every login. Without both, the
+# first double-click shows an "Untrusted application launcher" dialog instead
+# of running it ("Mark As Secure And Launch" on that dialog sets the same two
+# things by hand). StartupNotify=false above matters too: without it, XFCE
+# waits for a new window to appear and reports a false "Timeout was reached"
+# error, since this launcher only refocuses the existing one.
+gio set "$HOME/Desktop/home-organizer.desktop" metadata::trusted true 2>/dev/null || true
+gio set "$HOME/Desktop/home-organizer.desktop" metadata::xfce-exe-checksum \
+  "$(sha256sum "$HOME/Desktop/home-organizer.desktop" | cut -d' ' -f1)" 2>/dev/null || true
+
 # --password-store=basic: without it Chromium asks the system keyring for a
 # password store, and on an auto-login session the keyring is locked, so an
 # "Unlock Login Keyring" password dialog appears and grabs input. A kiosk

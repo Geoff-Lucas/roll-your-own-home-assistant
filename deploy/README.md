@@ -328,6 +328,41 @@ If it doesn't come up: check `sudo systemctl status home-organizer` first
 (most failures are the backend not running, not the browser), then
 `~/.xsession-errors`.
 
+### Minimizing to the desktop
+
+The **🖥️ Desktop** button in the header (`POST /api/system/minimize`, handled
+by `app/system.py`) minimizes whichever window is focused — always this app's
+own kiosk window, since a click on it can only reach the backend while that
+window has focus. It's for a quick look at the desktop (plugging something in,
+a file manager) without leaving the kiosk session.
+
+Getting back is the part a kiosk doesn't have a taskbar for, so
+`deploy/kiosk.sh` installs a **"Home Organizer" icon on the desktop** every
+login, running `deploy/return-to-kiosk.sh`: it brings the existing window
+back (deiconify, raise, focus, all via `xdotool windowactivate`) or, if the
+window is gone entirely — crashed, or the session restarted without going
+through `kiosk.sh` — starts the kiosk fresh instead. Only works on the kiosk
+itself (needs a display and `xdotool`); everywhere else `/system/minimize`
+reports 503, same convention as the Browser tab's endpoints.
+
+Getting a `.desktop` launcher to just run, with no clicks in between, took
+three things (all verified on this machine, XFCE 4.20 / gvfs 1.57):
+- **`gio set FILE metadata::trusted true`** — without it, the first
+  double-click shows an "Untrusted application launcher" dialog instead of
+  running it. This is what "Mark As Secure And Launch" on that dialog sets by
+  hand.
+- **`gio set FILE metadata::xfce-exe-checksum "$(sha256sum FILE | cut -d' ' -f1)"`**
+  — a checksum of the file's own bytes that has to match *right now*, so
+  it has to be set fresh every time the file's content changes (every login,
+  since `kiosk.sh` rewrites it). Undocumented as far as we could find; found by
+  diffing `gio info -a "*"` before and after clicking "Mark As Secure And
+  Launch" by hand. Without this one, `metadata::trusted` alone still isn't
+  enough — the same dialog keeps coming back.
+- **`StartupNotify=false`** in the `.desktop` file — without it, XFCE waits
+  for a new window to appear (the usual sign a launcher worked) and reports a
+  false "Launch Error: Timeout was reached", because this launcher only
+  refocuses the *existing* window rather than opening a new one.
+
 ### The Browser tab
 
 The **Browser** tab in the header shows a real web browser under the toolbar,
