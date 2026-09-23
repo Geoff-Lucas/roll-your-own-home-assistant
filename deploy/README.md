@@ -249,6 +249,16 @@ the weather (see `backend/app/voice/skills/`). Pieces, and how to set each up:
   as continuations. `GET /api/voice/status` shows `"claude_fallback": true`
   once both settings are in place.
 
+  **Web search.** Claude's training data has a cutoff, so on its own it can't
+  answer things like "what's the score" or "what's in the news today."
+  `HOME_ORGANIZER_VOICE_CLAUDE_WEB_SEARCH=true` gives it Anthropic's hosted
+  web-search tool — Claude decides on its own whether a question needs it;
+  when it does, the search runs as part of the same request, no extra
+  round trip. Off by default: a further step out than plain Q&A, since search
+  queries leave the house too, and each search Claude runs is billed on top
+  of the reply. `HOME_ORGANIZER_VOICE_CLAUDE_WEB_SEARCH_MAX_USES` (default 3)
+  caps how many searches one question can trigger.
+
 ## 3. Get the code onto the machine
 
 For the very first deploy, clone directly on the machine:

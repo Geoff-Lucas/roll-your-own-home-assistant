@@ -86,6 +86,12 @@ class Settings(BaseSettings):
     voice_claude_api_key: str = ""
     voice_claude_model: str = "claude-sonnet-5"
     voice_claude_timeout_seconds: float = 10.0
+    # Lets Claude search the web for questions its training data can't answer
+    # (current events, scores, prices...). Off by default: a further step out
+    # than plain Q&A — search queries leave the house too, not just the
+    # question — and each search Claude runs is billed on top of the reply.
+    voice_claude_web_search: bool = False
+    voice_claude_web_search_max_uses: int = 3
 
     @property
     def voice_models_dir(self) -> Path:

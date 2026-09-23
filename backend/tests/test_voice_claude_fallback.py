@@ -151,6 +151,47 @@ def test_the_api_is_called_with_the_configured_model_key_and_timeout(monkeypatch
     assert seen["kwargs"]["system"] == "system prompt"
     assert seen["kwargs"]["messages"] == [{"role": "user", "content": "a question"}]
     assert seen["kwargs"]["max_tokens"] == fallback.MAX_TOKENS
+    assert seen["kwargs"]["tools"] == []  # off unless explicitly turned on
+
+
+def test_web_search_is_off_by_default():
+    assert fallback._tools() == []
+
+
+def test_web_search_is_added_when_turned_on(monkeypatch):
+    monkeypatch.setattr(fallback.settings, "voice_claude_web_search", True)
+    monkeypatch.setattr(fallback.settings, "voice_claude_web_search_max_uses", 5)
+
+    assert fallback._tools() == [{"type": "web_search_20250305", "name": "web_search", "max_uses": 5}]
+
+
+def test_the_search_tool_is_included_in_the_actual_request_when_on(monkeypatch):
+    monkeypatch.setattr(fallback.settings, "voice_claude_web_search", True)
+    seen = {}
+
+    class FakeMessages:
+        def create(self, **kwargs):
+            seen["kwargs"] = kwargs
+
+            class Block:
+                type = "text"
+                text = "It's 72 today."
+
+            class Response:
+                content = [Block()]
+
+            return Response()
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            self.messages = FakeMessages()
+
+    fake_anthropic = type("module", (), {"Anthropic": FakeClient})
+    monkeypatch.setitem(__import__("sys").modules, "anthropic", fake_anthropic)
+
+    fallback._call_claude("system", "what's the weather in Tokyo")
+
+    assert seen["kwargs"]["tools"] == [{"type": "web_search_20250305", "name": "web_search", "max_uses": 3}]
 
 
 def test_only_text_blocks_are_read_and_multiple_are_joined(monkeypatch):
@@ -174,3 +215,31 @@ def test_only_text_blocks_are_read_and_multiple_are_joined(monkeypatch):
     monkeypatch.setitem(__import__("sys").modules, "anthropic", fake_anthropic)
 
     assert fallback._call_claude("system", "text") == "Part one. Part two."
+
+
+def test_search_result_blocks_are_skipped_the_same_way(monkeypatch):
+    # The block types a search actually adds, not just a generic stand-in.
+    class Block:
+        def __init__(self, type_, text=""):
+            self.type = type_
+            self.text = text
+
+    class FakeMessages:
+        def create(self, **kwargs):
+            class Response:
+                content = [
+                    Block("server_tool_use"),
+                    Block("web_search_tool_result"),
+                    Block("text", "It's 72 and sunny today."),
+                ]
+
+            return Response()
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            self.messages = FakeMessages()
+
+    fake_anthropic = type("module", (), {"Anthropic": FakeClient})
+    monkeypatch.setitem(__import__("sys").modules, "anthropic", fake_anthropic)
+
+    assert fallback._call_claude("system", "what's the weather") == "It's 72 and sunny today."
