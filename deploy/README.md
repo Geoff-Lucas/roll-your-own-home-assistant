@@ -111,7 +111,7 @@ in `backend/.env` (used with `aplay -D`; default `"default"`). On `h-asst` that
 is the monitor's own speakers over HDMI, and the thing to know is that **the
 speakers are only there while the screen is awake**:
 
-- When the screen blanks (X's screen saver, after 10 minutes idle) the HDMI link
+- When the screen blanks (X's screen saver, after 2 idle hours) the HDMI link
   drops and the monitor sleeps. The audio hardware then sees no monitor
   (`/proc/asound/card0/eld#*` say `monitor_present 0`), PulseAudio swaps its HDMI
   output for a null sink that swallows sound, and nothing can be heard. Awake,
@@ -132,9 +132,12 @@ speakers are only there while the screen is awake**:
   1.5 s (`HOME_ORGANIZER_DISPLAY_WAKE_SETTLE_SECONDS`) for the monitor to resync,
   so the acknowledgement tone or chime isn't lost. It knows the screen is asleep
   when PulseAudio's default output is the null sink. Touching the screen wakes it
-  as usual. For now the kiosk doesn't sleep at all: `deploy/kiosk.sh` runs
-  `xset s off` at login. Remove that line (and log in again, or run `xset s 600`)
-  to let the screen blank after 10 idle minutes; the wake-up above then takes over.
+  as usual. How long it waits is `SCREEN_SLEEP_SECONDS` in `deploy/kiosk.sh`
+  (7200, two hours), applied at login; to change it on the running kiosk, run
+  `xset s <seconds> <seconds>` with `DISPLAY=:0`. DPMS stays off: X has two
+  ways to blank a screen, and only the screen saver's is used. Beware
+  `xset dpms force on`: it also switches DPMS back on, with a 10-minute default,
+  which is how the app's wake-up once undid this setting.
 - To find the right raw output on a machine without PulseAudio, play something
   distinct on each HDMI device and listen — e.g. `aplay -D plughw:0,3 x.wav`,
   then `0,7`, `0,8` (list them with `aplay -l`) — and put it in `.env`.
