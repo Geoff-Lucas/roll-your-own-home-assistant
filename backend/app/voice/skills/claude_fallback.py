@@ -27,8 +27,12 @@ from ..text import spoken_clock
 
 logger = logging.getLogger(__name__)
 
-# A couple of spoken sentences' worth — this is a kiosk reply, not a chat transcript.
-MAX_TOKENS = 200
+# A safety cap, not the length limit: brevity comes from SYSTEM_PROMPT (and
+# tts.clean_for_speech trims what's spoken). The model's reasoning and any
+# web-search calls count against this too, so a tight cap cut answers off
+# before they started — 200 left a Nationals-score question with nothing but
+# reasoning and one search, and an empty reply.
+MAX_TOKENS = 1024
 
 SYSTEM_PROMPT = (
     "You are the voice assistant on a household kiosk, answering a question a rule-based "
@@ -88,9 +92,17 @@ def _call_claude(system: str, text: str) -> str:
         messages=[{"role": "user", "content": text}],
         tools=_tools(),
     )
-    # Search results and the tool-use record are their own block types; the
-    # spoken answer is only ever in the text blocks, so the rest is skipped.
-    return "".join(block.text for block in response.content if block.type == "text").strip()
+    # Search results, the tool-use record and reasoning are their own block
+    # types; the spoken answer is only ever in the text blocks.
+    answer = "".join(block.text for block in response.content if block.type == "text").strip()
+    if not answer:
+        # Otherwise this is invisible: handle() just says "couldn't reach Claude".
+        logger.warning(
+            "Claude returned no answer (stop_reason=%s, blocks=%s)",
+            getattr(response, "stop_reason", None),
+            [block.type for block in response.content],
+        )
+    return answer
 
 
 def handle(text: str, ctx: Context) -> Optional[Reply]:

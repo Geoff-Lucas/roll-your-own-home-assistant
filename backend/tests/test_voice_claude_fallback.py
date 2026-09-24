@@ -217,6 +217,38 @@ def test_only_text_blocks_are_read_and_multiple_are_joined(monkeypatch):
     assert fallback._call_claude("system", "text") == "Part one. Part two."
 
 
+def test_a_reply_cut_off_before_any_answer_is_logged_with_why(monkeypatch, caplog):
+    # The shape seen live: reasoning and searching used up the token budget.
+    class Block:
+        def __init__(self, type_):
+            self.type = type_
+
+    class FakeMessages:
+        def create(self, **kwargs):
+            class Response:
+                stop_reason = "max_tokens"
+                content = [Block("thinking"), Block("server_tool_use"), Block("web_search_tool_result")]
+
+            return Response()
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            self.messages = FakeMessages()
+
+    fake_anthropic = type("module", (), {"Anthropic": FakeClient})
+    monkeypatch.setitem(__import__("sys").modules, "anthropic", fake_anthropic)
+
+    with caplog.at_level("WARNING"):
+        assert fallback._call_claude("system", "what was the score") == ""
+
+    (record,) = [r for r in caplog.records if "no answer" in r.message]
+    assert "max_tokens" in record.message and "web_search_tool_result" in record.message
+
+
+def test_the_token_cap_leaves_room_for_reasoning_and_searching():
+    assert fallback.MAX_TOKENS >= 1024
+
+
 def test_search_result_blocks_are_skipped_the_same_way(monkeypatch):
     # The block types a search actually adds, not just a generic stand-in.
     class Block:
