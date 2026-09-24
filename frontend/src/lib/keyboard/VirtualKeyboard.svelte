@@ -33,6 +33,9 @@
       keyboard.setOptions({ layoutName: shiftLayout ? 'shift' : 'default' })
     } else if (button === '{enter}') {
       const field = $activeField
+      // In a multi-line field (a recipe's ingredients) the key types a new
+      // line instead (newLineOnEnter, set below); tapping outside closes it.
+      if (field?.tagName === 'TEXTAREA') return
       // Opt-in (data-submit-on-done): a field like the browser address bar
       // wants "done" to submit, since this keyboard can't send a real Enter.
       if (field?.dataset.submitOnDone !== undefined) {
@@ -63,14 +66,13 @@
           '{space} {enter}',
         ],
       },
-      display: {
-        '{bksp}': '⌫',
-        '{enter}': 'done',
-        '{shift}': '⇧',
-        '{space}': ' ',
-      },
+      display: displayFor(false),
     })
   })
+
+  function displayFor(multiline) {
+    return { '{bksp}': '⌫', '{enter}': multiline ? '↵' : 'done', '{shift}': '⇧', '{space}': ' ' }
+  }
 
   onDestroy(() => keyboard?.destroy())
 
@@ -79,6 +81,8 @@
   // existing title, not just typing a new one).
   $effect(() => {
     if ($activeField) {
+      const multiline = $activeField.tagName === 'TEXTAREA'
+      keyboard?.setOptions({ newLineOnEnter: multiline, display: displayFor(multiline) })
       keyboard?.setInput($activeField.value ?? '')
     }
   })

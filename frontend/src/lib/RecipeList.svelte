@@ -4,8 +4,11 @@
   import { currentPerson } from './currentPerson.js'
   import { favoriteRecipe, getFavoriteRecipeIds, getRecipes, importRecipe, unfavoriteRecipe } from './api.js'
   import RecipeDetailModal from './RecipeDetailModal.svelte'
+  import RecipeEditor from './recipes/RecipeEditor.svelte'
 
   let recipes = $state([])
+  // null: no editor open; 'new': adding a recipe; a recipe: editing that one.
+  let editing = $state(null)
   let favoriteIds = $state(new Set())
   let importUrl = $state('')
   let importing = $state(false)
@@ -72,6 +75,19 @@
     }
   }
 
+  function handleSaved(saved) {
+    const exists = recipes.some((r) => r.id === saved.id)
+    recipes = exists ? recipes.map((r) => (r.id === saved.id ? saved : r)) : [saved, ...recipes]
+    editing = null
+    selectedRecipe = saved // show what was saved
+  }
+
+  function handleDeleted(id) {
+    recipes = recipes.filter((r) => r.id !== id)
+    editing = null
+    selectedRecipe = null
+  }
+
   function thumbnail(recipe) {
     return recipe.image_path ?? recipe.source_image_url ?? null
   }
@@ -89,6 +105,7 @@
     <button type="button" onclick={handleImport} disabled={importing}>
       {importing ? 'Importing…' : 'Import'}
     </button>
+    <button type="button" class="add" onclick={() => (editing = 'new')}>✏️ Add a recipe</button>
   </div>
 
   {#if importError}
@@ -132,7 +149,22 @@
   </div>
 </div>
 
-<RecipeDetailModal recipe={selectedRecipe} onClose={() => (selectedRecipe = null)} />
+{#if !editing}
+  <RecipeDetailModal
+    recipe={selectedRecipe}
+    onClose={() => (selectedRecipe = null)}
+    onEdit={(recipe) => (editing = recipe)}
+  />
+{/if}
+
+{#if editing}
+  <RecipeEditor
+    recipe={editing === 'new' ? null : editing}
+    onSaved={handleSaved}
+    onDeleted={handleDeleted}
+    onClose={() => (editing = null)}
+  />
+{/if}
 
 <style>
   .recipes {
@@ -162,6 +194,12 @@
     border: 1px solid #2563eb;
     background: #2563eb;
     color: white;
+  }
+
+  .import-box button.add {
+    background: white;
+    color: #2563eb;
+    white-space: nowrap;
   }
 
   .error {

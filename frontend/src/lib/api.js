@@ -76,6 +76,18 @@ export function importRecipe(url) {
   return requestJson('/recipes/import', 'POST', { url })
 }
 
+export function createRecipe(payload) {
+  return requestJson('/recipes', 'POST', payload)
+}
+
+export function updateRecipe(id, payload) {
+  return requestJson(`/recipes/${id}`, 'PATCH', payload)
+}
+
+export function deleteRecipe(id) {
+  return request(`/recipes/${id}`, { method: 'DELETE' })
+}
+
 export function getFavoriteRecipeIds(personName) {
   const params = new URLSearchParams({ person_name: personName })
   return request(`/recipes/favorites?${params}`)

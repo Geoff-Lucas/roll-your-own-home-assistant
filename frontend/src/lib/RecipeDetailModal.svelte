@@ -1,5 +1,8 @@
 <script>
-  let { recipe, onClose } = $props()
+  let { recipe, onClose, onEdit } = $props()
+
+  // Imported recipes link back to their page; a typed one may not have one.
+  const isLink = (url) => /^https?:\/\//i.test(url ?? '')
 </script>
 
 {#if recipe}
@@ -44,8 +47,14 @@
         {/each}
       </ol>
 
-      {#if recipe.source_url}
+      {#if isLink(recipe.source_url)}
         <p class="source"><a href={recipe.source_url} target="_blank" rel="noreferrer">View original recipe</a></p>
+      {/if}
+
+      {#if onEdit}
+        <div class="actions">
+          <button type="button" onclick={() => onEdit(recipe)}>✏️ Edit</button>
+        </div>
       {/if}
     </div>
   </div>
@@ -137,5 +146,18 @@
 
   .source {
     font-size: 0.9rem;
+  }
+
+  .actions {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .actions button {
+    font-size: 1rem;
+    padding: 0.5rem 1rem;
+    border-radius: 0.4rem;
+    border: 1px solid #ccc;
+    background: #f2f2f2;
   }
 </style>

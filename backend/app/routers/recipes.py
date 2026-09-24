@@ -1,8 +1,9 @@
+import re
 from pathlib import Path
-from typing import List, Optional
+from typing import Annotated, List, Optional
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, StringConstraints
 from sqlmodel import select
 
 from ..config import settings
@@ -15,34 +16,81 @@ from ..recipes.ingredient_parsing import parse_ingredient_line
 router = APIRouter(prefix="/recipes", tags=["recipes"])
 
 
+# What people type in front of a line when writing a recipe out by hand. A
+# number only counts as numbering when a space follows its "." or ")", so a
+# quantity like "1.5 cups" is left alone.
+_BULLET = re.compile(r"^\s*[-*•·]+\s*")
+_NUMBERING = re.compile(r"^\s*(?:step\s*\d+\s*[:.)-]?|\d+[.)](?=\s))\s*", re.IGNORECASE)
+
+
+def _tidy_lines(lines: List[str], pattern: re.Pattern) -> List[str]:
+    """Drop blank lines and a leading bullet or step number from each line."""
+    return [cleaned for line in lines if (cleaned := pattern.sub("", line).strip())]
+
+
 def _build_ingredients(raw_lines: List[str]) -> List[dict]:
-    return [parse_ingredient_line(line) for line in raw_lines]
+    # The same parser the URL importer uses, so a typed recipe's ingredients
+    # come out structured the same way (name + quantity, for a shopping list).
+    return [parse_ingredient_line(line) for line in _tidy_lines(raw_lines, _BULLET)]
+
+
+def _tidy_steps(lines: List[str]) -> List[str]:
+    # Shown as a numbered list, so typed numbering would double up.
+    return [_BULLET.sub("", line) for line in _tidy_lines(lines, _NUMBERING)]
+
+
+def _tidy_tags(tags: List[str]) -> List[str]:
+    seen, out = set(), []
+    for tag in (t.strip().lower() for t in tags):
+        if tag and tag not in seen:
+            seen.add(tag)
+            out.append(tag)
+    return out
+
+
+Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
+Minutes = Optional[Annotated[int, Field(ge=0, le=24 * 60)]]
+Servings = Optional[Annotated[int, Field(ge=1, le=100)]]
 
 
 class RecipeCreate(BaseModel):
-    title: str
+    title: Title
     ingredients: List[str] = []  # raw text lines — the server structures these, see _build_ingredients
     steps: List[str] = []
     tags: List[str] = []
     dietary_tags: List[str] = []
     allergens: List[str] = []
     source_url: Optional[str] = None
-    prep_time_minutes: Optional[int] = None
-    cook_time_minutes: Optional[int] = None
-    servings: Optional[int] = None
+    prep_time_minutes: Minutes = None
+    cook_time_minutes: Minutes = None
+    servings: Servings = None
 
 
 class RecipeUpdate(BaseModel):
-    title: Optional[str] = None
+    title: Optional[Title] = None
     ingredients: Optional[List[str]] = None
     steps: Optional[List[str]] = None
     tags: Optional[List[str]] = None
     dietary_tags: Optional[List[str]] = None
     allergens: Optional[List[str]] = None
     source_url: Optional[str] = None
-    prep_time_minutes: Optional[int] = None
-    cook_time_minutes: Optional[int] = None
-    servings: Optional[int] = None
+    prep_time_minutes: Minutes = None
+    cook_time_minutes: Minutes = None
+    servings: Servings = None
+
+
+def _tidy(data: dict) -> dict:
+    """Apply the typed-entry cleanup to whichever fields are present."""
+    if "ingredients" in data:
+        data["ingredients"] = _build_ingredients(data["ingredients"])
+    if "steps" in data:
+        data["steps"] = _tidy_steps(data["steps"])
+    for field in ("tags", "dietary_tags", "allergens"):
+        if data.get(field) is not None:
+            data[field] = _tidy_tags(data[field])
+    if isinstance(data.get("source_url"), str):
+        data["source_url"] = data["source_url"].strip() or None
+    return data
 
 
 class RecipeImportRequest(BaseModel):
@@ -67,9 +115,7 @@ def list_favorite_recipe_ids(person_name: str, session: SessionDep) -> List[int]
 
 @router.post("", response_model=Recipe, status_code=201)
 def create_recipe(payload: RecipeCreate, session: SessionDep) -> Recipe:
-    data = payload.model_dump()
-    data["ingredients"] = _build_ingredients(data["ingredients"])
-    recipe = Recipe(**data)
+    recipe = Recipe(**_tidy(payload.model_dump()))
     session.add(recipe)
     session.commit()
     session.refresh(recipe)
@@ -97,9 +143,9 @@ def update_recipe(recipe_id: int, payload: RecipeUpdate, session: SessionDep) ->
     recipe = session.get(Recipe, recipe_id)
     if recipe is None:
         raise HTTPException(status_code=404, detail="Recipe not found")
-    data = payload.model_dump(exclude_unset=True)
-    if "ingredients" in data:
-        data["ingredients"] = _build_ingredients(data["ingredients"])
+    data = _tidy(payload.model_dump(exclude_unset=True))
+    if data.get("title", "") is None:
+        raise HTTPException(status_code=422, detail="A recipe needs a title")
     for field, value in data.items():
         setattr(recipe, field, value)
     session.add(recipe)
