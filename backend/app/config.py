@@ -167,11 +167,11 @@ class Settings(BaseSettings):
 
     @property
     def frontend_dist_dir(self) -> Path:
-        # The Svelte frontend is built on the dev machine, never on the Pi
+        # The Svelte frontend is built on the dev machine, never on the kiosk
         # (see PLAN.md "Deployment & updates") — this just points at wherever
         # that build output was copied to. Doesn't exist in local dev (Vite's
         # own dev server + proxy is used instead — see frontend/vite.config.js),
-        # only on a deployed Pi; main.py only mounts it if the directory exists.
+        # only on the deployed kiosk; main.py only mounts it if the directory exists.
         return Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
 
 

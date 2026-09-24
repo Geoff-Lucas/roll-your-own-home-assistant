@@ -1,7 +1,8 @@
 #!/bin/sh
 # Installed as ~/.xinitrc — see deploy/README.md. No window manager: a kiosk
-# showing exactly one always-fullscreen browser window doesn't need one, and
-# skipping it is one less thing running on a 4GB Pi.
+# showing exactly one always-fullscreen browser window doesn't need one. (The
+# live kiosk uses XFCE + deploy/kiosk.sh instead, which the Browser tab needs:
+# its window placement relies on a window manager.)
 
 xset s off
 xset -dpms

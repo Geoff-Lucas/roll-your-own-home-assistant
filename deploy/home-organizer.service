@@ -5,22 +5,22 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-# Change both of these if you used a different username during imaging or a
-# different clone location.
-User=pi
-WorkingDirectory=/home/pi/home_organizer/backend
+# A template: deploy/README.md step 4 substitutes the real username for
+# KIOSK_USER (and its numeric id for 1000 below) when installing it.
+User=KIOSK_USER
+WorkingDirectory=/home/KIOSK_USER/home_organizer/backend
 # System directories stay on PATH: the Browser tab launches chromium and drives
 # it with xdotool/wmctrl, all of which live in /usr/bin.
-Environment=PATH=/home/pi/home_organizer/backend/.venv/bin:/usr/local/bin:/usr/bin:/bin
+Environment=PATH=/home/KIOSK_USER/home_organizer/backend/.venv/bin:/usr/local/bin:/usr/bin:/bin
 # The X display the kiosk runs on — needed to open and place the browser window.
 Environment=DISPLAY=:0
 # How the app finds the user's PulseAudio (which owns the speakers): without this,
 # `aplay -D pulse` from a service gets "Connection refused" and everything is silent.
-# 1000 is the first normal user's numeric id (`id -u`); change it if User= above differs.
-# (Don't use %U: in a system service it means root, not User=.)
+# 1000 is the first normal user's numeric id (`id -u`); the install step
+# substitutes the real one. (Don't use %U: in a system service it means root, not User=.)
 Environment=XDG_RUNTIME_DIR=/run/user/1000
-EnvironmentFile=-/home/pi/home_organizer/backend/.env
-ExecStart=/home/pi/home_organizer/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+EnvironmentFile=-/home/KIOSK_USER/home_organizer/backend/.env
+ExecStart=/home/KIOSK_USER/home_organizer/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
 Restart=on-failure
 RestartSec=5
 

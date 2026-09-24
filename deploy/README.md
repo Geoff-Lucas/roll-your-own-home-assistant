@@ -6,20 +6,18 @@ Target: an x86_64 mini PC (Ryzen 5 3500U / 16GB / 512GB NVMe, hostname
 driving the 27" 2K portrait touchscreen over HDMI. (This replaced the original Raspberry Pi 4B
 plan — the Pi was judged too underpowered.)
 
-**Caveat up front:** the desktop/kiosk parts of this guide have not yet been
-run end-to-end on the real machine — everything here follows standard Debian,
-systemd and XFCE practice, but treat it as a first draft to verify on the
-device, the same way the motion sensor and hardware-dimming code elsewhere in
-this project are flagged as unverified without real hardware. (The motion
-sensor in particular is a Pi-GPIO feature; on this machine it simply stays
-disabled via the `BadPinFactory` fallback in `app/ambient/motion.py` unless
-you wire up a USB/other alternative later.)
+This guide describes the live kiosk on `h-asst`: its steps have been run
+there and its notes (audio, touch rotation, screen sleep, the desktop icon)
+were verified on that machine. Two things remain unverified for lack of
+hardware: the PIR motion sensor, a Raspberry Pi GPIO feature this machine
+doesn't have (turned off with `HOME_ORGANIZER_AMBIENT_MOTION_ENABLED=false`),
+and real backlight dimming (the overnight dim is a CSS overlay for now).
 
 Why Debian and not Ubuntu: Ubuntu ships Chromium only as a snap, which is
 slower to start and has sandboxing quirks that make it a worse fit for a
 kiosk. Debian ships a normal `chromium` deb.
 
-## 1. Install Debian 12
+## 1. Install Debian (13 "trixie" on h-asst)
 
 Use the netinst image. At the software-selection step choose only:
 
@@ -302,11 +300,11 @@ machine by hand each time.
 
 ## 4. Backend as a systemd service
 
-The unit file assumes user `pi` and `/home/pi/home_organizer`. Install it
-with your real username substituted in:
+The unit file is a template with `KIOSK_USER` where the username goes (and
+`1000` as its numeric id). Install it with yours substituted in:
 
 ```bash
-sed "s#/home/pi/#/home/$USER/#g; s#^User=pi\$#User=$USER#" \
+sed "s#KIOSK_USER#$USER#g; s#/run/user/1000#/run/user/$(id -u)#" \
   ~/home_organizer/deploy/home-organizer.service \
   | sudo tee /etc/systemd/system/home-organizer.service >/dev/null
 sudo systemctl daemon-reload

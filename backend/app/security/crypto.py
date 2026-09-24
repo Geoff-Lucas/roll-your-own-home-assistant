@@ -26,7 +26,7 @@ def _load_or_create_key() -> bytes:
         os.chmod(key_path, stat.S_IRUSR | stat.S_IWUSR)
     except (NotImplementedError, OSError):
         # Best-effort: platforms without POSIX permission bits (e.g. a
-        # Windows dev machine) just skip this; the Pi deployment target does not.
+        # Windows dev machine) just skip this; the Linux kiosk does not.
         pass
     return key
 

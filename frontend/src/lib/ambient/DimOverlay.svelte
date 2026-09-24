@@ -26,7 +26,7 @@
 {#if isDim}
   <!-- CSS-only dimming — reduces apparent brightness of the page content.
        This is NOT real backlight/brightness control (that needs an OS-level
-       mechanism like xrandr/vcgencmd/ddcutil on the Pi itself, which can't
+       mechanism like xrandr or ddcutil on the kiosk itself, which can't
        be done from a browser page); it's a first pass, good enough to dim
        the visual glare overnight. Revisit with real hardware dimming later. -->
   <div class="dim-overlay"></div>

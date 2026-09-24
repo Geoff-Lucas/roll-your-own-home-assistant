@@ -119,7 +119,7 @@ def _find_calendar_object(calendar: caldav.Calendar, uid: str, window_start: dat
     an *unbounded* search when no date range is given, which falls back to
     expanding recurrences from year 1 — `datetime.min.astimezone()` raises
     `OSError: [Errno 22] Invalid argument` on Windows (confirmed live; Linux
-    doesn't have this limitation, so it may be fine on the Pi, but there's
+    doesn't have this limitation, so it may be fine on the kiosk, but there's
     no reason to depend on that). (2) tested live against a real Google
     account: Google's CalDAV server doesn't actually honor server-side UID
     filtering — a bounded search with `uid=...` still returned every event
