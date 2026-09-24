@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 import pytest
 from sqlmodel import Session, SQLModel, create_engine, select
 
-from app.models import Event
+from app.models import Account, Event
 from app.sync.reconciler import reconcile_account_events
 
 
@@ -12,6 +12,8 @@ def session():
     engine = create_engine("sqlite://", connect_args={"check_same_thread": False})
     SQLModel.metadata.create_all(engine)
     with Session(engine) as s:
+        s.add(Account(id=1, provider="caldav", display_name="Test", person_name="Geoff"))  # events need a real account
+        s.commit()
         yield s
 
 

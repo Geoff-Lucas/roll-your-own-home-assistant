@@ -467,7 +467,9 @@ during — the first real deployment:
 
 - ~~Adopt Alembic~~ — done (see "Database changes" above). The kiosk's
   existing database was adopted at the baseline migration with its data
-  intact; a copy from just before is at `backend/data/home_organizer.db.pre-migrations`.
+  intact. Copies from just before each migration are in `backend/data/`
+  (`home_organizer.db.pre-migrations`, `.pre-fk-rules`); either can be put back
+  as `home_organizer.db` and the app migrates it forward on the next start.
 - ~~Verify the CalDAV write-back path against a real account~~ — done, against
   a real Google account (see PLAN.md Calendar section for what broke and got
   fixed along the way). Still worth a smoke test against iCloud/generic

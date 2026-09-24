@@ -18,4 +18,5 @@ class MealPlan(SQLModel, table=True):
     # raising PydanticUserError at class-definition time.
     id: Optional[int] = Field(default=None, primary_key=True)
     plan_date: date = Field(index=True, unique=True)
-    recipe_id: Optional[int] = Field(default=None, foreign_key="recipe.id")
+    # Deleting a recipe leaves the day in place, just unassigned.
+    recipe_id: Optional[int] = Field(default=None, foreign_key="recipe.id", ondelete="SET NULL")

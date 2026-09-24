@@ -39,7 +39,9 @@ class Event(SQLModel, table=True):
     model_config = ConfigDict(validate_assignment=True)
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    account_id: int = Field(foreign_key="account.id", index=True)
+    # Deleting an account deletes its cached events; they're only a copy of the
+    # server's, and come back with a sync if the account is linked again.
+    account_id: int = Field(foreign_key="account.id", index=True, ondelete="CASCADE")
     uid: str = Field(index=True)  # CalDAV event UID, shared across all occurrences of a series
 
     title: str

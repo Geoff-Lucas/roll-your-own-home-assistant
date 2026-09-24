@@ -1,9 +1,11 @@
+from pathlib import Path
 from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlmodel import select
 
+from ..config import settings
 from ..db import SessionDep
 from ..models import Recipe, RecipeFavorite
 from ..recipes.images import ensure_recipe_image_downloaded
@@ -111,8 +113,15 @@ def delete_recipe(recipe_id: int, session: SessionDep) -> None:
     recipe = session.get(Recipe, recipe_id)
     if recipe is None:
         raise HTTPException(status_code=404, detail="Recipe not found")
+    image_path = recipe.image_path
+    # Favorites go with it and meal-plan days are unassigned (the foreign keys'
+    # ON DELETE rules, see the models).
     session.delete(recipe)
     session.commit()
+    if image_path:
+        # The copy downloaded on first favorite (app/recipes/images.py). Only
+        # the file name is used, so a stored path can't point outside the folder.
+        (settings.recipe_images_dir / Path(image_path).name).unlink(missing_ok=True)
 
 
 @router.post("/{recipe_id}/favorite", status_code=204)

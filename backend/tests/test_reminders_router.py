@@ -7,7 +7,7 @@ from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine
 
 from app.db import get_session
-from app.models import Event
+from app.models import Account, Event
 from app.routers import reminders as reminders_module
 
 TODAY = date.today()
@@ -25,6 +25,10 @@ def setup():
     app = FastAPI()
     app.include_router(reminders_module.router)
     app.dependency_overrides[get_session] = override_get_session
+
+    with Session(engine) as session:
+        session.add(Account(id=1, provider="caldav", display_name="Test", person_name="Geoff"))  # events need a real account
+        session.commit()
 
     return TestClient(app), engine
 

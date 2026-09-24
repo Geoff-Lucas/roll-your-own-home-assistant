@@ -44,6 +44,6 @@ class RecipeFavorite(SQLModel, table=True):
     """Per-person favorite, so each household member can favorite independently."""
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    recipe_id: int = Field(foreign_key="recipe.id", index=True)
+    recipe_id: int = Field(foreign_key="recipe.id", index=True, ondelete="CASCADE")
     person_name: str = Field(index=True)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

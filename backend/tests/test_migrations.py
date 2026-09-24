@@ -1,12 +1,14 @@
 import logging
 
 import pytest
+from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
+from alembic.script import ScriptDirectory
 from sqlalchemy import inspect, text
 from sqlmodel import SQLModel, create_engine
 
-from app import db, models
+from app import db
 
 ALL_TABLES = {"account", "event", "location", "mealplan", "recipe", "recipefavorite", "timer"}
 
@@ -26,9 +28,24 @@ def version(engine):
 
 
 def head():
-    from alembic.script import ScriptDirectory
-
     return ScriptDirectory.from_config(db._alembic_config()).get_current_head()
+
+
+def event_delete_rule(engine):
+    with engine.connect() as connection:
+        (fk,) = connection.exec_driver_sql("pragma foreign_key_list('event')").fetchall()
+    return fk[6]  # on_delete
+
+
+def build_pre_migrations_database(engine):
+    """A database as the app made it before migrations: the baseline schema,
+    with no record of any migration having run (like the kiosk's was, and the
+    copy kept at data/home_organizer.db.pre-migrations still is)."""
+    config = db._alembic_config()
+    with engine.begin() as connection:
+        config.attributes["connection"] = connection
+        command.upgrade(config, db.BASELINE_REVISION)
+        connection.exec_driver_sql("drop table alembic_version")
 
 
 def test_a_fresh_database_is_built_by_the_migrations(engine):
@@ -49,35 +66,49 @@ def test_the_migrations_and_the_models_agree(engine):
     assert differences == []
 
 
-def test_a_database_from_before_migrations_is_adopted_with_its_data_intact(engine):
-    SQLModel.metadata.create_all(engine)  # how the app used to create it
+def test_a_database_from_before_migrations_is_adopted_and_brought_up_to_date(engine):
+    build_pre_migrations_database(engine)
     with engine.begin() as connection:
         connection.execute(text("insert into recipe (title, created_at) values ('Pancakes', '2026-09-01 00:00:00')"))
+    assert event_delete_rule(engine) == "NO ACTION"
 
     db.migrate(engine)
 
     assert version(engine) == head()
+    assert event_delete_rule(engine) == "CASCADE"  # later migrations ran too
     with engine.connect() as connection:
         assert connection.execute(text("select title from recipe")).scalars().all() == ["Pancakes"]
 
 
-def test_an_old_database_missing_newer_tables_gets_them(engine):
-    # The laptop's dev database predated the location and timer tables.
-    SQLModel.metadata.create_all(engine, tables=[models.Account.__table__, models.Recipe.__table__])
+def test_an_old_database_missing_tables_is_refused_and_left_alone(engine):
+    # The laptop's old dev database predated the location and timer tables.
+    with engine.begin() as connection:
+        connection.exec_driver_sql("create table account (id integer primary key)")
+        connection.exec_driver_sql("create table recipe (id integer primary key)")
 
-    db.migrate(engine)
-
-    assert tables(engine) == ALL_TABLES | {"alembic_version"}
-
-
-def test_an_old_database_is_not_guessed_at_once_the_schema_has_moved_on(engine, monkeypatch):
-    SQLModel.metadata.create_all(engine)
-    monkeypatch.setattr(db, "BASELINE_REVISION", "an-older-revision")
-
-    with pytest.raises(db.MigrationError, match="predates migrations"):
+    with pytest.raises(db.MigrationError, match="lacks .*location.*timer"):
         db.migrate(engine)
 
-    assert "alembic_version" not in tables(engine)  # left untouched, not half-adopted
+    assert tables(engine) == {"account", "recipe"}
+
+
+def test_a_migration_that_fails_partway_leaves_the_database_as_it_was(engine):
+    build_pre_migrations_database(engine)
+    with engine.begin() as connection:
+        connection.exec_driver_sql("pragma foreign_keys=off")
+        connection.execute(
+            text("insert into event (account_id, uid, title, all_day, last_synced_at, reminder_dismissed) "
+                 "values (99, 'orphan', 'Nobody''s', 0, '2026-09-01 00:00:00', 0)")
+        )  # fmt: skip
+
+    # The tables get rebuilt, then the integrity check finds the orphan and fails.
+    with pytest.raises(db.MigrationError, match="don't exist"):
+        db.migrate(engine)
+
+    assert "alembic_version" not in tables(engine)  # never recorded as migrated
+    assert event_delete_rule(engine) == "NO ACTION"  # the rebuild was undone too
+    with engine.connect() as connection:
+        assert connection.execute(text("select uid from event")).scalars().all() == ["orphan"]
 
 
 def test_migrating_twice_changes_nothing(engine):
@@ -85,6 +116,13 @@ def test_migrating_twice_changes_nothing(engine):
     db.migrate(engine)
 
     assert version(engine) == head()
+
+
+def test_foreign_keys_are_enforced_again_after_migrating(engine):
+    db.migrate(engine)
+
+    with engine.connect() as connection:
+        assert connection.exec_driver_sql("pragma foreign_keys").scalar_one() == 1
 
 
 def test_migrating_leaves_the_apps_logging_alone(engine):
