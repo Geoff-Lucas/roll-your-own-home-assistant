@@ -1,12 +1,15 @@
+from contextlib import contextmanager
 from datetime import date, datetime
-from typing import List, Optional
+from typing import Iterator, List, Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, model_validator
 from sqlmodel import select
 
+from ..config import settings
 from ..db import SessionDep
 from ..models import Account, Event
+from ..sync.locks import AccountBusy, account_lock
 from ..sync.caldav_client import (
     CalDAVError,
     create_event_on_server,
@@ -73,6 +76,33 @@ class EventUpdate(BaseModel):
     end_date: Optional[date] = None
     reminder_lead_days: Optional[int] = None
     reminder_text: Optional[str] = None
+
+
+@contextmanager
+def _account_turn(account_id: int) -> Iterator[None]:
+    """Hold the account's sync lock across the server write and the local
+    commit, so a sync can't fetch before the write and reconcile after it
+    (see app/sync/locks.py). Waits for an in-progress sync, usually a second
+    or two; a hung one gets a 503 rather than a hung request."""
+    try:
+        with account_lock(account_id, timeout=settings.calendar_write_wait_seconds):
+            yield
+    except AccountBusy as exc:
+        raise HTTPException(status_code=503, detail="The calendar is busy syncing — try again in a moment") from exc
+
+
+def _get_event(session: SessionDep, event_id: int) -> Event:
+    event = session.get(Event, event_id)
+    if event is None:
+        raise HTTPException(status_code=404, detail="Event not found")
+    return event
+
+
+def _reload_event(session: SessionDep, event_id: int) -> Event:
+    """Read the event afresh once it's our turn: a sync may have changed or
+    removed it while this request waited."""
+    session.expunge_all()
+    return _get_event(session, event_id)
 
 
 def _get_writable_account(session: SessionDep, account_id: int) -> Account:
@@ -148,64 +178,63 @@ def create_event(payload: EventCreate, session: SessionDep) -> Event:
     event = Event(**payload.model_dump(), uid=new_uid())
     event.recurrence_id = _compute_recurrence_id(event)
 
-    try:
-        create_event_on_server(account, build_ics(event))
-    except CalDAVError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    with _account_turn(account.id):
+        try:
+            create_event_on_server(account, build_ics(event))
+        except CalDAVError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
 
-    session.add(event)
-    session.commit()
-    session.refresh(event)
+        session.add(event)
+        session.commit()
+        session.refresh(event)
     return event
 
 
 @router.patch("/{event_id}", response_model=Event)
 def update_event(event_id: int, payload: EventUpdate, session: SessionDep) -> Event:
-    event = session.get(Event, event_id)
-    if event is None:
-        raise HTTPException(status_code=404, detail="Event not found")
-    if event.rrule is not None:
-        raise HTTPException(status_code=400, detail="Editing recurring events isn't supported yet")
+    with _account_turn(_get_event(session, event_id).account_id):
+        event = _reload_event(session, event_id)
+        if event.rrule is not None:
+            raise HTTPException(status_code=400, detail="Editing recurring events isn't supported yet")
 
-    account = _get_writable_account(session, event.account_id)
-    # Must be captured before mutating event below — the resource on the
-    # server is still at the pre-edit time until this update succeeds, so
-    # searching around the *new* time could miss it. See
-    # caldav_client.event_search_window's docstring.
-    search_window = event_search_window(event)
+        account = _get_writable_account(session, event.account_id)
+        # Must be captured before mutating event below — the resource on the
+        # server is still at the pre-edit time until this update succeeds, so
+        # searching around the *new* time could miss it. See
+        # caldav_client.event_search_window's docstring.
+        search_window = event_search_window(event)
 
-    for field, value in payload.model_dump(exclude_unset=True).items():
-        setattr(event, field, value)
-    event.recurrence_id = _compute_recurrence_id(event)
+        for field, value in payload.model_dump(exclude_unset=True).items():
+            setattr(event, field, value)
+        event.recurrence_id = _compute_recurrence_id(event)
 
-    try:
-        update_event_on_server(account, event.uid, search_window, build_ics(event))
-    except CalDAVError as exc:
-        # event's in-memory fields were mutated above but never committed,
-        # so they're discarded when the request's session closes — the
-        # local cache stays consistent with what the server actually has.
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        try:
+            update_event_on_server(account, event.uid, search_window, build_ics(event))
+        except CalDAVError as exc:
+            # event's in-memory fields were mutated above but never committed,
+            # so they're discarded when the request's session closes — the
+            # local cache stays consistent with what the server actually has.
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
 
-    session.add(event)
-    session.commit()
-    session.refresh(event)
+        session.add(event)
+        session.commit()
+        session.refresh(event)
     return event
 
 
 @router.delete("/{event_id}", status_code=204)
 def delete_event(event_id: int, session: SessionDep) -> None:
-    event = session.get(Event, event_id)
-    if event is None:
-        raise HTTPException(status_code=404, detail="Event not found")
-    if event.rrule is not None:
-        raise HTTPException(status_code=400, detail="Deleting recurring events isn't supported yet")
+    with _account_turn(_get_event(session, event_id).account_id):
+        event = _reload_event(session, event_id)
+        if event.rrule is not None:
+            raise HTTPException(status_code=400, detail="Deleting recurring events isn't supported yet")
 
-    account = _get_writable_account(session, event.account_id)
+        account = _get_writable_account(session, event.account_id)
 
-    try:
-        delete_event_on_server(account, event.uid, event_search_window(event))
-    except CalDAVError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        try:
+            delete_event_on_server(account, event.uid, event_search_window(event))
+        except CalDAVError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
 
-    session.delete(event)
-    session.commit()
+        session.delete(event)
+        session.commit()

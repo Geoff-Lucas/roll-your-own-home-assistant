@@ -59,6 +59,9 @@ def test_principal_uses_bearer_auth_for_oauth_account(monkeypatch):
     assert captured["auth_type"] == "bearer"
     assert captured["password"] == "fresh-access-token"
     assert "username" not in captured
+    # A sync holds the account lock while it waits on the server, so a hung
+    # server must time out rather than block event edits forever.
+    assert captured["timeout"] == caldav_client.settings.caldav_timeout_seconds
 
 
 def test_principal_uses_basic_auth_for_password_account(monkeypatch):
@@ -88,3 +91,4 @@ def test_principal_uses_basic_auth_for_password_account(monkeypatch):
     assert captured["username"] == "geoff@icloud.com"
     assert captured["password"] == "app-specific-password"
     assert "auth_type" not in captured
+    assert captured["timeout"] == caldav_client.settings.caldav_timeout_seconds

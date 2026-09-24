@@ -9,6 +9,7 @@ from ..db import engine
 from ..models import Account
 from .caldav_client import fetch_account_ics
 from .ics_parser import parse_ics_resource
+from .locks import account_lock
 from .reconciler import reconcile_account_events
 
 logger = logging.getLogger(__name__)
@@ -29,11 +30,14 @@ def sync_once() -> None:
         accounts = session.exec(select(Account)).all()
         for account in accounts:
             try:
-                raw_resources = fetch_account_ics(account, window_start, window_end)
-                parsed = []
-                for raw in raw_resources:
-                    parsed.extend(parse_ics_resource(raw, account.id, window_start, window_end))
-                reconcile_account_events(session, account.id, parsed, window_start, window_end)
+                # Held from fetch through reconcile, so a local write can't land
+                # in between and be judged against a stale fetch (see locks.py).
+                with account_lock(account.id):
+                    raw_resources = fetch_account_ics(account, window_start, window_end)
+                    parsed = []
+                    for raw in raw_resources:
+                        parsed.extend(parse_ics_resource(raw, account.id, window_start, window_end))
+                    reconcile_account_events(session, account.id, parsed, window_start, window_end)
             except Exception:
                 logger.exception(
                     "CalDAV sync failed for account %s (%s) — will retry next cycle",

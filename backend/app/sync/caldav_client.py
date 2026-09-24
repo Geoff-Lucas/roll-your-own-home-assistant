@@ -4,6 +4,7 @@ from typing import List
 import caldav
 import icalendar
 
+from ..config import settings
 from ..models import Account, Event
 from ..security.crypto import decrypt
 from .google_oauth import get_valid_access_token
@@ -33,10 +34,14 @@ def _principal(account: Account) -> caldav.Principal:
         # Google CalDAV requires OAuth exclusively — see app/sync/google_oauth.py.
         refresh_token = decrypt(account.oauth_refresh_token)
         access_token = get_valid_access_token(refresh_token)
-        client = caldav.DAVClient(url=account.caldav_url, password=access_token, auth_type="bearer")
+        client = caldav.DAVClient(
+            url=account.caldav_url, password=access_token, auth_type="bearer", timeout=settings.caldav_timeout_seconds
+        )
     else:
         password = decrypt(account.encrypted_credential)
-        client = caldav.DAVClient(url=account.caldav_url, username=account.username, password=password)
+        client = caldav.DAVClient(
+            url=account.caldav_url, username=account.username, password=password, timeout=settings.caldav_timeout_seconds
+        )
     return client.principal()
 
 

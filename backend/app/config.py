@@ -18,6 +18,12 @@ class Settings(BaseSettings):
     sync_interval_seconds: int = 300
     sync_window_past_days: int = 30
     sync_window_future_days: int = 365
+    # A sync and an event edit take turns per account (app/sync/locks.py), so a
+    # hung server must not hold that turn forever: each CalDAV request gives up
+    # after caldav_timeout_seconds, and an edit waits at most
+    # calendar_write_wait_seconds for a sync to finish before answering 503.
+    caldav_timeout_seconds: float = 20.0
+    calendar_write_wait_seconds: float = 30.0
 
     # Weather (see app/weather.py). The location shown is chosen at runtime
     # from the on-screen picker (see app/locations.py); these three only seed
