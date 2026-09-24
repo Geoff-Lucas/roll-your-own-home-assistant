@@ -14,6 +14,7 @@ class Commands:
         self.ran = []
         self.missing = set()
         self.failing = set()
+        self.dpms_enabled = False  # the kiosk's setting: sleep is the screen saver's job
 
     async def __call__(self, *command):
         self.ran.append(command)
@@ -23,6 +24,10 @@ class Commands:
             raise OSError("boom")
         if command[:2] == ("pactl", "get-default-sink"):
             return 0, self.sink
+        if command == ("xset", "q"):
+            return 0, f"DPMS (Display Power Management Signaling):\n  DPMS is {'Enabled' if self.dpms_enabled else 'Disabled'}"
+        if command == ("xset", "dpms", "force", "on"):
+            self.dpms_enabled = True  # as the real xset does, verified on the kiosk
         return 0, ""
 
 
@@ -67,8 +72,30 @@ async def test_a_sleeping_screen_is_woken_and_given_time_to_come_back(commands):
     assert await display.wake_display(sleep=sleeps) is True
 
     assert ("xset", "s", "reset") in commands.ran
-    assert ("xset", "dpms", "force", "on") in commands.ran
     assert sleeps.seconds == [1.5]  # the monitor needs a moment before it can show or play anything
+
+
+@pytest.mark.anyio
+async def test_waking_does_not_switch_dpms_back_on(commands):
+    # `xset dpms force on` quietly enables DPMS, with X's 10-minute default. Run
+    # on every "Hey Jarvis" and alarm chime, it undid the kiosk's own sleep setting.
+    commands.sink = ASLEEP_SINK
+
+    await display.wake_display(sleep=Sleeps())
+
+    assert commands.dpms_enabled is False
+    assert ("xset", "dpms", "force", "on") not in commands.ran
+
+
+@pytest.mark.anyio
+async def test_a_screen_asleep_under_dpms_is_forced_back_on(commands):
+    # If DPMS is what's in use (someone set it up that way), waking has to end it.
+    commands.sink = ASLEEP_SINK
+    commands.dpms_enabled = True
+
+    await display.wake_display(sleep=Sleeps())
+
+    assert ("xset", "dpms", "force", "on") in commands.ran
 
 
 @pytest.mark.anyio

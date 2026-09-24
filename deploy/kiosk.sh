@@ -13,14 +13,14 @@ done
 # lands on a screen edge. (Bring them back for maintenance: `xfce4-panel &`.)
 xfce4-panel --quit 2>/dev/null
 
-# Never blank the screen. Two independent X mechanisms can do it — the screen
-# saver AND DPMS (power management) — so both need turning off, or the display
-# still standbys after DPMS's own 10-minute timer even with the screen saver
-# disabled. Blanking drops the HDMI signal: the monitor sleeps and its speakers
-# go silent with it, so the wake word and alarms would be unseen and unheard.
-# (The app can wake a sleeping screen, see app/display.py, so to let it sleep
-# again just remove these two lines.)
-xset s off
+# Let the screen sleep after two idle hours (no touch, keyboard or mouse).
+# Sleeping drops the HDMI signal, so the monitor's speakers go quiet too; the
+# app wakes it first for "Hey Jarvis" and alarms (app/display.py). Two X
+# mechanisms can blank the screen; only the screen saver does it here, and
+# DPMS stays off so its own 10-minute default can't cut in. (The app must not
+# run `xset dpms force on` while DPMS is off: that quietly turns it back on.)
+SCREEN_SLEEP_SECONDS=7200
+xset s "$SCREEN_SLEEP_SECONDS" "$SCREEN_SLEEP_SECONDS"
 xset -dpms
 
 # A "🖥️ Desktop" button in the app (see app/system.py) minimizes it to look at

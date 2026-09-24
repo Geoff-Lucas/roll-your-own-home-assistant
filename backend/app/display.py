@@ -1,7 +1,8 @@
 """Waking the kiosk's screen from its idle sleep.
 
-After ten minutes without a touch, X blanks the screen and drops the HDMI
-signal, so the monitor sleeps — and its speakers, which are fed over that same
+After two hours without a touch (deploy/kiosk.sh sets it), X's screen saver
+blanks the screen and drops the HDMI signal, so the monitor sleeps — and its
+speakers, which are fed over that same
 cable, go silent with it. The app can still hear ("Hey Jarvis") and still has
 timers to ring, but nobody can see or hear it. `wake_display()` undoes that.
 
@@ -58,8 +59,13 @@ async def wake_display(sleep: Callable[[float], Awaitable[None]] = asyncio.sleep
     global _warned
     try:
         was_asleep = await speakers_asleep()
-        await _run("xset", "s", "reset")  # ends the screen-saver blank
-        await _run("xset", "dpms", "force", "on")  # and DPMS off, if that is what is in use
+        await _run("xset", "s", "reset")  # ends the screen-saver blank: how the kiosk sleeps
+        # Only if DPMS is in use: `xset dpms force on` also *enables* DPMS (with
+        # X's 10-minute default), which undid the kiosk's sleep setting every
+        # time the wake word or an alarm woke the screen.
+        _code, state = await _run("xset", "q")
+        if "DPMS is Enabled" in state:
+            await _run("xset", "dpms", "force", "on")
     except FileNotFoundError:
         if not _warned:
             _warned = True
