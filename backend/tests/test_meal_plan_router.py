@@ -42,6 +42,15 @@ def test_default_week_returns_seven_days_all_empty(setup):
     assert all(entry["recipe_id"] is None for entry in body)
 
 
+def test_this_week_is_the_households_week(setup, monkeypatch):
+    # The household's date (its timezone setting), not the machine clock's.
+    monkeypatch.setattr(meal_plan_module, "local_today", lambda: date(2026, 9, 23))  # a Wednesday
+
+    days = [entry["plan_date"] for entry in setup.get("/meal-plan").json()]
+
+    assert days[0] == "2026-09-20" and days[-1] == "2026-09-26"  # Sunday to Saturday
+
+
 def test_explicit_range_returns_matching_day_count(setup):
     client = setup
     start = date.today()

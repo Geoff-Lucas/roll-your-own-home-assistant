@@ -60,6 +60,7 @@ def reconcile_account_events(
                 "start_date",
                 "end_date",
                 "rrule",
+                "last_synced_at",  # when the server last had it, not when it was first cached
             ):
                 setattr(current, field, getattr(parsed, field))
             session.add(current)

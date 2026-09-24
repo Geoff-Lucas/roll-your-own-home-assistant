@@ -54,6 +54,16 @@ def test_existing_event_is_updated_in_place(session):
     assert rows[0].title == "Renamed"
 
 
+def test_a_resync_records_when_the_event_was_last_seen(session):
+    first = make_event(last_synced_at=datetime(2026, 7, 1, 8, 0, tzinfo=timezone.utc))
+    reconcile_account_events(session, account_id=1, parsed_events=[first], window_start=WINDOW_START, window_end=WINDOW_END)
+
+    later = make_event(last_synced_at=datetime(2026, 7, 2, 8, 0, tzinfo=timezone.utc))
+    reconcile_account_events(session, account_id=1, parsed_events=[later], window_start=WINDOW_START, window_end=WINDOW_END)
+
+    assert session.exec(select(Event)).one().last_synced_at == datetime(2026, 7, 2, 8, 0)
+
+
 def test_event_removed_upstream_and_in_window_is_deleted(session):
     reconcile_account_events(session, account_id=1, parsed_events=[make_event()], window_start=WINDOW_START, window_end=WINDOW_END)
 
