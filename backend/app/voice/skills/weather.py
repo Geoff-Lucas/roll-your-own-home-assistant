@@ -7,6 +7,7 @@ from typing import Optional
 
 from ..core import Context, Reply
 from ..text import spoken_clock
+from . import claude_fallback
 
 _ABOUT_WEATHER = re.compile(
     r"\b(weather|forecast|temperature|how (hot|cold|warm|chilly)|degrees|rain|raining|rainy|snow|snowing"
@@ -17,10 +18,47 @@ _TEMPERATURE_ONLY = re.compile(r"\b(temperature|how (hot|cold|warm|chilly)|degre
 _WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
 _WET_ICONS = {"rain", "drizzle", "thunderstorm", "snow"}
 
+# "in Tokyo" names a place; "in the afternoon", "for tomorrow" and "at the
+# moment" don't. After one of these prepositions, whatever remains once these
+# words are dropped is taken to be a place. (Numbers never match, so "at 5 pm"
+# and "in 2 hours" are left alone.)
+_PLACE_AFTER = re.compile(r"\b(?:in|for|at|near|around)\s+([a-z' ]+)")
+_NOT_A_PLACE = {
+    "the", "a", "an", "this", "that", "next", "coming", "few", "couple", "of", "rest", "and", "to",
+    "today", "tonight", "tomorrow", "morning", "afternoon", "evening", "night", "noon", "midnight",
+    "weekend", "week", "now", "right", "moment", "later", "soon", "hour", "hours", "minute", "minutes",
+    "day", "days", "while", "am", "pm", "celsius", "fahrenheit", "degrees",
+    "here", "outside", "town", "home", "general", *_WEEKDAYS,
+}  # fmt: skip
+# "for my walk", "for our trip": about us, not somewhere.
+_ABOUT_US = {"my", "our", "your"}
+
+
+def _place_named(t: str, ctx: Context) -> Optional[str]:
+    """The place a question names, if it's not here ("weather in Tokyo"); None
+    when it names no place, or names the place whose forecast we have."""
+    here = (ctx.location_name or "").split(",")[0].strip().lower()
+    for match in _PLACE_AFTER.finditer(t):
+        words = match.group(1).split()
+        if words and words[0] in _ABOUT_US:
+            continue
+        place = " ".join(w for w in words if w not in _NOT_A_PLACE)
+        if place and not (here and place.startswith(here)):
+            return place
+    return None
+
 
 def handle(t: str, ctx: Context) -> Optional[Reply]:
     if not _ABOUT_WEATHER.search(t):
         return None
+    if _place_named(t, ctx):
+        # Only the local forecast is cached. With Claude available, decline so
+        # the question falls through to it (it can search the web); otherwise
+        # say so rather than read out the wrong city's weather.
+        if claude_fallback.available():
+            return None
+        where = ctx.location_name.split(",")[0] if ctx.location_name else "here"
+        return Reply(f"I only have the weather for {where}.", understood=False)
     weather = ctx.weather
     if not weather:
         return Reply("I don't have the weather yet. Try again in a moment.")

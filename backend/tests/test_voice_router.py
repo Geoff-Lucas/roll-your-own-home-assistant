@@ -394,6 +394,58 @@ def test_weather_without_a_known_place(say):
     assert say("what's the weather", location=None).startswith("It's 84 degrees and overcast. Today's")
 
 
+# Only the local forecast is cached, so a question about somewhere else must
+# not be answered with it (it used to read out Fairfax's weather for Tokyo).
+SOMEWHERE_ELSE = [
+    "what's the weather forecast in tokyo this weekend",
+    "how hot is it in phoenix",
+    "is it raining in london",
+    "what's the forecast for chicago",
+    "what's the weather like in new york city tomorrow",
+]
+
+
+@pytest.mark.parametrize("said", SOMEWHERE_ELSE)
+def test_weather_somewhere_else_goes_to_claude(say, monkeypatch, said):
+    from app.voice.skills import claude_fallback
+
+    asked = []
+    monkeypatch.setattr(claude_fallback.settings, "voice_claude_enabled", True)
+    monkeypatch.setattr(claude_fallback.settings, "voice_claude_api_key", "sk-test-key")
+    monkeypatch.setattr(claude_fallback, "_call_claude", lambda system, text: asked.append(text) or "It's 70 there.")
+
+    assert say(said) == "It's 70 there."
+    assert len(asked) == 1
+
+
+@pytest.mark.parametrize("said", SOMEWHERE_ELSE)
+def test_weather_somewhere_else_is_declined_honestly_without_claude(say, said):
+    assert say(said) == "I only have the weather for Fairfax."
+
+
+def test_weather_somewhere_else_without_a_known_place(say):
+    assert say("what's the weather in tokyo", location=None) == "I only have the weather for here."
+
+
+@pytest.mark.parametrize(
+    "said, starts",
+    [
+        ("what's the weather in fairfax", "It's 84 degrees and overcast in Fairfax"),
+        ("what's the weather here", "It's 84 degrees and overcast in Fairfax"),
+        ("what's the weather for tomorrow", "Tomorrow in Fairfax"),
+        ("what's the weather for today", "It's 84 degrees and overcast in Fairfax"),
+        ("what's the weather for the rest of the day", "It's 84 degrees and overcast in Fairfax"),
+        ("is it going to rain in the afternoon", "Maybe"),
+        ("will it rain at 5 pm", "Maybe"),
+        ("is it going to rain in an hour", "Maybe"),
+        ("what's the temperature in celsius", "It's 84 degrees"),
+        ("what's the temperature at the moment", "It's 84 degrees"),
+    ],
+)
+def test_times_and_here_are_not_mistaken_for_other_places(say, said, starts):
+    assert say(said).startswith(starts)
+
+
 # --- routing ----------------------------------------------------------------
 
 
