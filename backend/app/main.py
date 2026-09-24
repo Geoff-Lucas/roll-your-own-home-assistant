@@ -6,6 +6,7 @@ from typing import Optional
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlmodel import Session
 
@@ -14,6 +15,7 @@ from .browser.controller import controller as browser_controller
 from .config import settings
 from .db import engine, init_db
 from .locations import seed_default_location
+from .logging_setup import configure_logging
 from .routers import (
     accounts,
     ambient,
@@ -85,14 +87,18 @@ async def lifespan(app: FastAPI):
 settings.recipe_images_dir.mkdir(parents=True, exist_ok=True)
 settings.ambient_photos_dir.mkdir(parents=True, exist_ok=True)
 
+configure_logging()
+
 app = FastAPI(title="Home Organizer", lifespan=lifespan)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origins,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts)
+if settings.cors_origins:  # none by default: see config.py
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origins,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 # Everything lives under /api so that, in production, the same FastAPI
 # process can also serve the built frontend's static files from "/" without

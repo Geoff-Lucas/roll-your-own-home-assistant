@@ -264,12 +264,18 @@ the weather (see `backend/app/voice/skills/`). Pieces, and how to set each up:
 For the very first deploy, clone directly on the machine:
 
 ```bash
-git clone <your-repo-url> ~/home_organizer
+git clone https://github.com/Geoff-Lucas/roll-your-own-home-assistant.git ~/home_organizer
 cd ~/home_organizer/backend
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 cp .env.example .env
+chmod 600 .env                    # it will hold API keys and OAuth secrets
+mkdir -p data && chmod 700 data   # the database: calendar events, recipes
 ```
+
+Edit `.env` with a plain text editor (`nano .env`), not a word processor: an
+office app saves it in its own format (`.env.odt`) or adds invisible bytes at
+the start, and the app silently ignores what it can't read.
 
 Edit `.env` — at minimum set `HOME_ORGANIZER_WEATHER_LATITUDE`/`_LONGITUDE`
 and `HOME_ORGANIZER_WEATHER_LOCATION_NAME` (e.g. `"Fairfax, VA"`) for your
@@ -337,6 +343,16 @@ delete `~/.config/autostart/home-organizer-kiosk.desktop`.
 If it doesn't come up: check `sudo systemctl status home-organizer` first
 (most failures are the backend not running, not the browser), then
 `~/.xsession-errors`.
+
+The backend's log is `sudo journalctl -u home-organizer -e`. It shows the app's
+own messages and every change or failed request, but not the page's
+successful polling (several reads a second), and not the caldav library's
+warnings, which quote raw calendar data (see `app/logging_setup.py`).
+
+The API only answers requests addressed to `localhost` or `127.0.0.1`
+(`HOME_ORGANIZER_ALLOWED_HOSTS`) and gives no other website cross-site access
+(`HOME_ORGANIZER_CORS_ORIGINS`, empty). The page is served by the backend
+itself, so it needs neither; a future phone app would need an entry in both.
 
 ### Minimizing to the desktop
 

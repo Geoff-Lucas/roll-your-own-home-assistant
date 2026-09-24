@@ -12,7 +12,13 @@ class Settings(BaseSettings):
     # Deliberately outside the repo by default — see PLAN.md "Security & credentials".
     encryption_key_path: Path = Path.home() / ".home_organizer" / "secret.key"
 
-    cors_origins: list[str] = ["*"]
+    # The page is served by this same process (and by Vite's proxy in dev), so
+    # nothing needs cross-site access; allowing "*" let any web page open in the
+    # Browser tab call this API. Add an origin here only for a real other client.
+    cors_origins: list[str] = []
+    # Host names requests may be addressed to. Rejects DNS-rebinding tricks,
+    # where a web page points its own domain at 127.0.0.1 to reach this API.
+    allowed_hosts: list[str] = ["localhost", "127.0.0.1"]
 
     # CalDAV sync worker (see app/sync/)
     sync_interval_seconds: int = 300

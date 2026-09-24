@@ -29,3 +29,13 @@ def test_start_motion_sensor_does_not_raise_without_gpio_hardware():
     # This is the actual condition confirmed by hand: instantiating gpiozero's
     # MotionSensor here raises BadPinFactory.
     motion.start_motion_sensor()
+
+
+def test_no_gpio_hardware_is_one_log_line_not_a_traceback(caplog, monkeypatch):
+    monkeypatch.setattr(config.settings, "ambient_motion_enabled", True)
+
+    with caplog.at_level("WARNING"):
+        motion.start_motion_sensor()
+
+    (record,) = [r for r in caplog.records if "Motion sensor unavailable" in r.message]
+    assert record.exc_info is None

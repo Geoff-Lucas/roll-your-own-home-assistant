@@ -46,9 +46,12 @@ def start_motion_sensor() -> None:
 
             sensor = MotionSensor(settings.ambient_motion_gpio_pin)
         sensor.when_motion = _on_motion
-    except Exception:
+    except Exception as exc:
+        # One line, not a traceback: on a machine with no GPIO header (the kiosk
+        # mini PC) this is the expected outcome on every start, not a fault.
         logger.warning(
-            "Motion sensor unavailable (no GPIO hardware, or gpiozero has nothing to attach to on this "
-            "platform) — ambient mode will only wake on touch, not motion.",
-            exc_info=True,
+            "Motion sensor unavailable (%s: %s) — ambient mode will only wake on touch, not motion. "
+            "Set HOME_ORGANIZER_AMBIENT_MOTION_ENABLED=false if there's no sensor.",
+            type(exc).__name__,
+            exc,
         )
