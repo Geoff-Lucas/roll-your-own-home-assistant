@@ -1,4 +1,5 @@
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 import pytest
 from fastapi import FastAPI
@@ -6,6 +7,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine
 
+from app.config import settings
 from app.db import get_session
 from app.models import Account, Event
 from app.routers import reminders as reminders_module
@@ -111,6 +113,31 @@ def test_dismiss_removes_it_from_the_list(setup):
     assert res.status_code == 204
 
     assert client.get("/reminders").json() == []
+
+
+def timed_event_at(engine, local_day: date, hour: int, tz: str, title: str) -> None:
+    """A timed event stored the way sync stores it: as naive UTC."""
+    start = datetime.combine(local_day, time(hour, 0), tzinfo=ZoneInfo(tz))
+    seed_event(engine, title=title, all_day=False, start_time=start, end_time=start + timedelta(hours=2))
+
+
+@pytest.mark.parametrize(
+    "tz, hour",
+    [
+        ("America/New_York", 20),  # 8 PM Eastern is already the next day in UTC
+        ("Asia/Tokyo", 8),  # 8 AM in Tokyo is still the day before in UTC
+    ],
+)
+def test_a_timed_event_is_on_its_local_day_not_its_utc_day(setup, monkeypatch, tz, hour):
+    client, engine = setup
+    monkeypatch.setattr(settings, "timezone", tz)
+    today = datetime.now(ZoneInfo(tz)).date()
+    timed_event_at(engine, today + timedelta(days=2), hour, tz, "Birthday dinner")
+
+    (reminder,) = client.get("/reminders").json()
+
+    assert reminder["event_date"] == (today + timedelta(days=2)).isoformat()
+    assert reminder["days_until"] == 2
 
 
 def test_dismiss_unknown_event_returns_404(setup):

@@ -1,4 +1,26 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone, tzinfo
+from zoneinfo import ZoneInfo
+
+import tzlocal
+
+from .config import settings
+
+
+def local_tz() -> tzinfo:
+    """The household's timezone: HOME_ORGANIZER_TIMEZONE, else the machine's own."""
+    if settings.timezone:
+        return ZoneInfo(settings.timezone)
+    return tzlocal.get_localzone()
+
+
+def local_date(naive_utc: datetime) -> date:
+    """The household's calendar day for a stored naive-UTC instant. Not just
+    .date(): 8 PM Eastern is already tomorrow in UTC."""
+    return naive_utc.replace(tzinfo=timezone.utc).astimezone(local_tz()).date()
+
+
+def local_today() -> date:
+    return datetime.now(local_tz()).date()
 
 
 def to_naive_utc(value: datetime) -> datetime:

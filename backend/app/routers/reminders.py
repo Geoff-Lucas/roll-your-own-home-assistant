@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from typing import List
 
 from fastapi import APIRouter, HTTPException
@@ -8,6 +8,7 @@ from sqlmodel import select
 from ..db import SessionDep
 from ..models import Event
 from ..reminders.detection import compute_reminder
+from ..time_utils import local_date, local_today
 
 router = APIRouter(prefix="/reminders", tags=["reminders"])
 
@@ -21,15 +22,15 @@ class ReminderEntry(BaseModel):
 
 
 def _event_date(event: Event) -> date:
-    return event.start_date if event.all_day else event.start_time.date()
+    # A timed event's start is stored as naive UTC, so its UTC date can be a
+    # day off from the household's (an 8 PM Eastern dinner is tomorrow in UTC).
+    return event.start_date if event.all_day else local_date(event.start_time)
 
 
 @router.get("", response_model=List[ReminderEntry])
 def list_reminders(session: SessionDep, lookahead_days: int = 60) -> List[ReminderEntry]:
-    # local server date, same convention as app/ambient/schedule.py — this
-    # is about which day the household is on, not the naive-UTC convention
-    # Event storage uses for precise instants.
-    today = datetime.now().date()
+    # Which day the household is on, in its own timezone (see time_utils.local_tz).
+    today = local_today()
     window_end = today + timedelta(days=lookahead_days)
 
     entries: List[ReminderEntry] = []

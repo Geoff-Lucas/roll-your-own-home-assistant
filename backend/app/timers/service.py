@@ -8,16 +8,14 @@ The voice commands built later call these same functions.
 """
 
 import re
-from datetime import datetime, time, timedelta, timezone, tzinfo
+from datetime import datetime, time, timedelta, timezone
 from typing import Optional
-from zoneinfo import ZoneInfo
 
-import tzlocal
 from sqlmodel import Session, select
 
 from ..config import settings
 from ..models import Timer
-from ..time_utils import to_naive_utc
+from ..time_utils import local_tz, to_naive_utc  # noqa: F401  local_tz is also used via service.local_tz()
 
 MAX_TIMER_SECONDS = 99 * 3600 + 59 * 60 + 59
 REPEATS = ("none", "daily", "weekdays")
@@ -26,12 +24,6 @@ _ALARM_TIME = re.compile(r"^([01]\d|2[0-3]):([0-5]\d)$")
 
 def _now() -> datetime:
     return to_naive_utc(datetime.now(timezone.utc))
-
-
-def local_tz() -> tzinfo:
-    if settings.timezone:
-        return ZoneInfo(settings.timezone)
-    return tzlocal.get_localzone()
 
 
 def parse_alarm_time(text: str) -> tuple[int, int]:
