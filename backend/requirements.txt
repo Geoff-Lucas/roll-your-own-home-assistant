@@ -1,6 +1,8 @@
 fastapi>=0.110
 uvicorn[standard]>=0.29
 sqlmodel>=0.0.16
+# Schema migrations, applied by the app at startup (app/db.py, migrations/).
+alembic>=1.13
 pydantic-settings>=2.2
 cryptography>=42
 caldav>=1.3

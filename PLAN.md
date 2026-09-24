@@ -138,7 +138,7 @@ Tiered, cheapest/lightest first — appropriate for 4GB RAM with cloud access as
 
 ## Schema migrations
 
-- `SQLModel.metadata.create_all` only creates missing tables — it never alters existing ones. That's fine while developing (just recreate the dev DB), but **adopt Alembic before the first real household data lands on the Pi**, so later model changes (and there will be many — recurrence fields are already queued) don't force a wipe-and-relink of everyone's accounts.
+- **Done (Sept 2026): Alembic.** `backend/migrations/`, applied by the app at startup (`app/db.py` `migrate()`). The first migration is the schema as it stood then; the kiosk's existing database (already holding real data) was checked column-for-column against it and adopted at that revision rather than rebuilt. `tests/test_migrations.py` fails if a model changes without a matching migration. Writing one: see `deploy/README.md` "Ongoing updates".
 
 ## Deployment & updates
 
@@ -179,4 +179,4 @@ Tiered, cheapest/lightest first — appropriate for 4GB RAM with cloud access as
 8. Ambient mode (photo carousel, dim schedule, motion wake).
 9. Voice pipeline — last, since it's the most independent piece and easiest to bolt on once the core app works.
 
-Before first real deployment to the Pi (whenever real accounts/data go in): adopt Alembic (see Schema migrations) and set up the deploy script + systemd units.
+Before first real deployment (whenever real accounts/data go in): adopt Alembic (see Schema migrations) and set up the deploy script + systemd units. Both done.

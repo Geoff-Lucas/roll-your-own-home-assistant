@@ -446,14 +446,28 @@ kiosk browser picks up frontend changes on its next reload (`F5` with a
 keyboard attached, or restart the session); `systemctl restart` picks up
 backend changes immediately.
 
+**Database changes** need no separate step: the backend applies any pending
+migrations (`backend/migrations/`) itself at startup, before serving anything.
+After changing a model, write the migration on the dev machine and commit it
+with the change:
+
+```bash
+cd backend
+alembic revision --autogenerate -m "add calories to recipe"
+```
+
+Read the generated file before committing — autogenerate misses some things
+(a rename comes out as drop + add, which loses the column's data).
+`tests/test_migrations.py` fails if a model changes without a migration.
+
 ## Before this holds real household data
 
 A few things from PLAN.md are explicitly meant to happen before — not
 during — the first real deployment:
 
-- **Adopt Alembic** (see PLAN.md "Schema migrations") — `create_all` only
-  creates missing tables, it never alters existing ones. Every model change
-  since would currently mean wiping the DB.
+- ~~Adopt Alembic~~ — done (see "Database changes" above). The kiosk's
+  existing database was adopted at the baseline migration with its data
+  intact; a copy from just before is at `backend/data/home_organizer.db.pre-migrations`.
 - ~~Verify the CalDAV write-back path against a real account~~ — done, against
   a real Google account (see PLAN.md Calendar section for what broke and got
   fixed along the way). Still worth a smoke test against iCloud/generic
