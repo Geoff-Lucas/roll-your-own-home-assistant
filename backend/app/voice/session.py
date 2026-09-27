@@ -24,7 +24,7 @@ from ..timers import service
 from ..weather import get_cached_weather
 from .core import Context, Reply
 from .mic import mic_lock
-from .recorder import MicUnavailable, Recorder
+from .recorder import MicUnavailable, Recorder, speech_level_dbfs
 from .router import route
 from .stt import SpeechRecognitionUnavailable, WhisperTranscriber
 from .tts import Speaker, choose_speaker, clean_for_speech
@@ -191,6 +191,8 @@ class VoiceSession:
                     await self._wake_screen()
                     await self._ack()
                 recording = await self.recorder.record(self._stop, self._on_level)
+            # Before the usable check: "I didn't hear anything" is when it matters most.
+            self.timing["speech_dbfs"] = speech_level_dbfs(recording.pcm)
             if not recording.usable:
                 self._finish(error="I didn't hear anything.")
                 return

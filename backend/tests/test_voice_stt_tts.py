@@ -92,7 +92,28 @@ def test_transcribing_feeds_the_model_normalized_audio_and_joins_the_segments(fa
     assert audio[0] == pytest.approx(1.0, abs=1e-3) and audio[1] == pytest.approx(-1.0)
     assert options["language"] == "en"
     assert options["vad_filter"] is True
-    assert "timer" in options["initial_prompt"]
+    # No hint phrase: the model echoed it back ("...a beautiful kiosk. Set an
+    # alarm."), and commands were recognized just as well without it.
+    assert options.get("initial_prompt") is None
+
+
+@pytest.mark.anyio
+async def test_warming_up_loads_the_model_so_the_first_command_is_not_the_slow_one(fake_whisper, models_dir):
+    pytest.importorskip("numpy")
+    install_model(models_dir)
+    transcriber = stt.WhisperTranscriber()
+
+    await transcriber.warm_up()
+    transcriber.transcribe(b"\x00\x00" * 100)
+
+    assert len(fake_whisper.instances) == 1  # loaded at warm-up, reused by the command
+
+
+@pytest.mark.anyio
+async def test_warming_up_without_a_model_does_nothing_and_downloads_nothing(fake_whisper):
+    await stt.WhisperTranscriber().warm_up()
+
+    assert fake_whisper.instances == []
 
 
 def test_the_model_is_loaded_offline_once_and_reused(fake_whisper, models_dir):

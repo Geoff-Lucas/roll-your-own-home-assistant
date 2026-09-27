@@ -16,12 +16,9 @@ from ..config import settings
 
 logger = logging.getLogger(__name__)
 
-# Nudges the model toward the vocabulary of the commands it will actually hear
-# ("timer", "alarm", "stopwatch"), which matters most for short utterances.
-PROMPT = (
-    "Set a timer for ten minutes. Set an alarm for seven a.m. Cancel the timer. Start the stopwatch. "
-    "What time is it? What's the weather tomorrow? Will it rain today?"
-)
+# No initial_prompt (a hint phrase of sample commands): there used to be one,
+# and the model would echo it back into what it heard ("...a beautiful kiosk.
+# Set an alarm."). Tested on the kiosk without it, commands came out right anyway.
 
 
 class SpeechRecognitionUnavailable(RuntimeError):
@@ -69,6 +66,18 @@ class WhisperTranscriber:
                 )
             return self._model
 
+    async def warm_up(self) -> None:
+        """Load the model now, at startup, so the first command isn't the slow one."""
+        import asyncio
+
+        if not self.status()[0]:
+            return
+        try:
+            await asyncio.to_thread(self._load)
+            logger.info("Speech model %s loaded", settings.voice_stt_model)
+        except Exception:
+            logger.exception("Couldn't load the speech model; the first command will try again")
+
     def transcribe(self, pcm: bytes) -> str:
         """16 kHz mono 16-bit PCM in, text out. Blocking — run it in a thread."""
         import numpy as np
@@ -80,7 +89,6 @@ class WhisperTranscriber:
             language="en",
             beam_size=1,
             vad_filter=True,  # trims silence and ignores non-speech noise
-            initial_prompt=PROMPT,
             condition_on_previous_text=False,
             temperature=0.0,
         )

@@ -36,6 +36,20 @@ def rms(chunk: bytes) -> float:
     return math.sqrt(sum(s * s for s in samples) / len(samples))
 
 
+def speech_level_dbfs(pcm: bytes) -> Optional[float]:
+    """How loud the speech in a recording was, in dBFS (0 is the loudest
+    possible): the average of its loudest quarter, so gaps between words don't
+    drag it down. Kept in the voice history, so a misheard command can be told
+    apart from one that was simply too quiet. For scale, on the kiosk: the
+    room is about -70, speech from the monitor's speakers about -16."""
+    levels = sorted((rms(pcm[i : i + CHUNK_BYTES]) for i in range(0, len(pcm) - CHUNK_BYTES + 1, CHUNK_BYTES)), reverse=True)
+    if not levels:
+        return None
+    loudest = levels[: max(1, len(levels) // 4)]
+    level = sum(loudest) / len(loudest)
+    return round(20 * math.log10(max(level, 1.0) / 32768), 1)
+
+
 class EndpointDetector:
     """Watches loudness chunk by chunk and says when a spoken command has ended.
 

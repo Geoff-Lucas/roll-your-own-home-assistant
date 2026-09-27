@@ -37,6 +37,28 @@ def chunks(seconds):
 # --- loudness ---------------------------------------------------------------
 
 
+def test_speech_level_is_the_loudness_of_the_speech_not_the_gaps():
+    speech, silence = pcm_at(3000) * 5, pcm_at(0) * 15  # a quarter speech, the rest silence
+
+    assert recorder.speech_level_dbfs(speech + silence) == pytest.approx(-20.8, abs=0.1)
+
+
+def test_speech_level_extremes():
+    assert recorder.speech_level_dbfs(pcm_at(32767) * 4) == pytest.approx(0.0, abs=0.1)
+    assert recorder.speech_level_dbfs(pcm_at(0) * 4) == pytest.approx(-90.3, abs=0.1)
+    assert recorder.speech_level_dbfs(b"") is None
+
+
+def test_a_pause_of_over_a_second_mid_sentence_does_not_end_it_with_the_defaults():
+    # With 1.1 s of silence the end, "I..." was cut off before the rest was said.
+    det = detector(silence_seconds=recorder.settings.voice_silence_seconds)
+    pause = [QUIET] * chunks(1.3)
+
+    verdict, _ = feed(det, [QUIET] * 3 + [SPEECH] * 6 + pause + [SPEECH] * 6 + [QUIET] * 3)
+
+    assert verdict is None
+
+
 def test_rms_of_silence_a_tone_and_nothing():
     assert rms(pcm_at(0)) == 0
     assert rms(pcm_at(1000)) == pytest.approx(1000)

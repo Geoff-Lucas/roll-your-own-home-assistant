@@ -68,6 +68,7 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(run_weather_loop()),
         asyncio.create_task(run_timer_loop()),
         asyncio.create_task(warm_up_speech()),
+        asyncio.create_task(voice_session.transcriber.warm_up()),
     ]
     wake_listener = build_wake_listener()
     if wake_listener is not None:

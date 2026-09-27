@@ -356,6 +356,29 @@ async def test_failures_are_in_the_history_too():
 
 
 @pytest.mark.anyio
+async def test_the_history_says_how_loud_the_speech_was():
+    # So "misheard" can be told from "too quiet" afterwards.
+    loud = (3000).to_bytes(2, "little", signed=True) * 16000  # a second at about -21 dBFS
+    session = make(recorder=FakeRecorder(Recording(loud, "done")))
+
+    await run(session)
+
+    assert session.history[-1]["speech_dbfs"] == pytest.approx(-20.8, abs=0.2)
+
+
+@pytest.mark.anyio
+async def test_the_level_is_kept_even_when_nothing_was_heard():
+    faint = (30).to_bytes(2, "little", signed=True) * 16000  # someone across a noisy room
+    session = make(recorder=FakeRecorder(Recording(faint, "no_speech")))
+
+    await run(session)
+
+    entry = session.history[-1]
+    assert entry["error"] == "I didn't hear anything."
+    assert entry["speech_dbfs"] == pytest.approx(-60.8, abs=0.2)
+
+
+@pytest.mark.anyio
 async def test_typed_commands_are_recorded_without_timings():
     session = make()
 

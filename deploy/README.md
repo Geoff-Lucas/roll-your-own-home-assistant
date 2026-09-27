@@ -166,9 +166,24 @@ the weather (see `backend/app/voice/skills/`). Pieces, and how to set each up:
   ```
 
   Until it is installed, tapping 🎤 says so on screen. The model is chosen with
-  `HOME_ORGANIZER_VOICE_STT_MODEL` (default `base.en`; `small.en` is more accurate
-  and slower). Speech recognition needs the `faster-whisper` package, which is
-  in `requirements.txt`.
+  `HOME_ORGANIZER_VOICE_STT_MODEL` (default `base.en`). The kiosk is trying
+  `small.en` (`.venv/bin/python -m app.voice.setup --model small.en`, 486 MB):
+  better with casual speech, but measured at about 3.2 s per command on this
+  machine against 1.0 s for `base.en` (more CPU threads don't help). Both are
+  installed; switching back is removing that line from `.env` and restarting.
+  The model is loaded at startup, so the first command isn't slower. Speech
+  recognition needs the `faster-whisper` package, which is in `requirements.txt`.
+
+  Diagnosing misrecognitions: `GET /api/voice/history` keeps the last 25
+  interactions with what was heard and `speech_dbfs`, how loud the speech
+  reached the mic (0 is the loudest possible). On the kiosk the empty room
+  sits near -70 and clear speech at arm's length near -16; a miss with speech
+  much below about -45 was probably too quiet rather than misheard. Measured
+  in Sept 2026: the USB mic itself is clean (no clipping, very low noise), and
+  its Auto Gain Control helps (+14 to +19 dB), so leave it on. Recording ends
+  after `HOME_ORGANIZER_VOICE_SILENCE_SECONDS` of quiet (1.6; at 1.1 it cut
+  people off mid-sentence). There's deliberately no hint phrase for the model:
+  it used to echo the sample commands back into what it heard.
 - **Voice for replies.** `sudo apt install -y espeak-ng` gives a robotic but
   zero-setup voice, used automatically. A natural-sounding **Piper** voice is
   used instead once one is chosen. Piper itself is the `piper-tts` pip package

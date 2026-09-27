@@ -73,7 +73,9 @@ class Settings(BaseSettings):
     # speakers go with it), the wake word and ringing timers wake it. The monitor
     # then takes a moment to resync before it can show or play anything.
     display_wake_settle_seconds: float = 1.5
-    voice_silence_seconds: float = 1.1  # quiet this long after speech = finished
+    # Quiet this long after speech = finished. 1.1 s cut people off mid-sentence
+    # ("I." and "Well..." in the history); longer waits a little more at the end.
+    voice_silence_seconds: float = 1.6
     voice_start_timeout_seconds: float = 6.0  # give up if nothing is said
     voice_max_seconds: float = 15.0
     # Hands-free: say "Hey Jarvis" instead of tapping. Off by default because it
