@@ -1,5 +1,6 @@
+import html
 import secrets
-from typing import Dict
+from typing import Dict, Optional
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -20,25 +21,46 @@ _pending: Dict[str, dict] = {}
 
 
 @router.get("/start")
-def start_link(person_name: str, display_name: str, color: str = "#4285F4") -> RedirectResponse:
-    """Visit this URL directly in a browser to link a Google account —
-    there's no dedicated frontend UI for this yet (see PLAN.md, account
-    linking has always been API/URL-driven so far). Redirects to Google's
-    own login+consent screen; we never see the household member's Google
-    password, only get a token back via the /callback redirect.
+def start_link(
+    session: SessionDep,
+    person_name: Optional[str] = None,
+    display_name: Optional[str] = None,
+    color: str = "#4285F4",
+    account_id: Optional[int] = None,
+) -> RedirectResponse:
+    """Visit this URL directly in a browser, on the kiosk, to link a Google
+    account — there's no dedicated frontend UI for this yet (see PLAN.md,
+    account linking has always been API/URL-driven so far). Redirects to
+    Google's own login+consent screen; we never see the household member's
+    Google password, only get a token back via the /callback redirect.
+
+    ?person_name=...&display_name=... links a new account. ?account_id=N
+    renews an existing one's sign-in in place (Google expires it, e.g. after 7
+    days while the Cloud project's consent screen is in "Testing"), keeping its
+    events and reminder flags instead of adding a duplicate.
     """
+    if account_id is not None:
+        account = session.get(Account, account_id)
+        if account is None or account.provider != "google":
+            raise HTTPException(status_code=404, detail="No linked Google account with that id")
+        details = {"account_id": account_id}
+    elif person_name and display_name:
+        details = {"person_name": person_name, "display_name": display_name, "color": color}
+    else:
+        raise HTTPException(status_code=422, detail="Give person_name and display_name, or an account_id to re-link")
+
     state = secrets.token_urlsafe(16)
     authorization_url, code_verifier = build_authorization_url(state)
     # code_verifier must survive to /callback (a separate request, separate
     # Flow instance) for PKCE token exchange to succeed — see
     # sync/google_oauth.py's build_authorization_url docstring.
-    _pending[state] = {
-        "person_name": person_name,
-        "display_name": display_name,
-        "color": color,
-        "code_verifier": code_verifier,
-    }
+    _pending[state] = {**details, "code_verifier": code_verifier}
     return RedirectResponse(authorization_url)
+
+
+def _page(heading: str, *lines: str) -> HTMLResponse:
+    body = "".join(f"<p>{line}</p>" for line in lines)
+    return HTMLResponse(f"<html><body style='font-family: sans-serif; padding: 2rem;'><h2>{heading}</h2>{body}</body></html>")
 
 
 @router.get("/callback")
@@ -48,6 +70,24 @@ def oauth_callback(session: SessionDep, code: str = Query(...), state: str = Que
         raise HTTPException(status_code=400, detail="Unknown or expired link request — start over from /start")
 
     refresh_token, email = exchange_code(code, pending["code_verifier"])
+
+    if "account_id" in pending:
+        account = session.get(Account, pending["account_id"])
+        if account is None:
+            raise HTTPException(status_code=404, detail="That account was removed while you were signing in")
+        if account.username and email.lower() != account.username.lower():
+            raise HTTPException(
+                status_code=400,
+                detail=f"You signed in as {email}, but this account is {account.username}. Start again and sign in as {account.username}.",
+            )
+        account.oauth_refresh_token = encrypt(refresh_token)
+        session.add(account)
+        session.commit()
+        return _page(
+            "Google Calendar re-linked ✅",
+            f"{html.escape(email)} is syncing again; its calendar will catch up within a few minutes.",
+            "You can close this tab.",
+        )
 
     account = Account(
         provider="google",
@@ -61,10 +101,9 @@ def oauth_callback(session: SessionDep, code: str = Query(...), state: str = Que
     session.add(account)
     session.commit()
 
-    return HTMLResponse(
-        f"<html><body style='font-family: sans-serif; padding: 2rem;'>"
-        f"<h2>Google Calendar linked ✅</h2>"
-        f"<p>{email} is now linked as {pending['person_name']} — {pending['display_name']}.</p>"
-        f"<p>You can close this tab.</p>"
-        f"</body></html>"
+    return _page(
+        "Google Calendar linked ✅",
+        f"{html.escape(email)} is now linked as {html.escape(pending['person_name'])} — "
+        f"{html.escape(pending['display_name'])}. Its id is {account.id}, for re-linking later.",
+        "You can close this tab.",
     )

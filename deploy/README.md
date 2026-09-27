@@ -312,6 +312,24 @@ OAuth flow from a browser *on this machine* (the XFCE session works for that
 `http://localhost:8000/api/google-oauth/callback` and `localhost` has to
 mean the machine running the backend.
 
+**If a Google calendar stops updating**, check the log for `CalDAV sync failed`
+with `invalid_grant: Token has been expired or revoked`: Google has ended the
+app's sign-in. Renew it in place (keeping the account's events and reminder
+flags; `/start` with names would add a duplicate account) by opening this on
+the kiosk and signing in as the same Google account:
+
+```
+http://localhost:8000/api/google-oauth/start?account_id=1
+```
+
+(the account's id is on the page shown after linking, or in
+`curl localhost:8000/api/accounts`). If it stops again after exactly 7 days,
+the Google Cloud project's OAuth consent screen is in **Testing**, where Google
+expires sign-ins after 7 days. Switching it to **In production** (Google Auth
+Platform → Audience → Publish app) stops that; for a personal project that
+never goes through Google's verification, sign-in then shows an "unverified
+app" warning you click past ("Advanced" → continue).
+
 After this first clone, use `deploy/deploy.sh` from your dev machine for
 every subsequent update instead (see step 6) — no need to `git pull` on the
 machine by hand each time.
