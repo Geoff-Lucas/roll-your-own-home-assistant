@@ -13,6 +13,7 @@
   import RingingOverlay from './lib/timers/RingingOverlay.svelte'
   import { startTimers } from './lib/timers/store.js'
   import LocationBadge from './lib/LocationBadge.svelte'
+  import SyncWarning from './lib/sync/SyncWarning.svelte'
   import VirtualKeyboard from './lib/keyboard/VirtualKeyboard.svelte'
   import AmbientOverlay from './lib/ambient/AmbientOverlay.svelte'
   import DimOverlay from './lib/ambient/DimOverlay.svelte'
@@ -24,6 +25,14 @@
   let loadError = $state(null)
   let activeView = $state('calendar')
   let minimizeError = $state(null)
+  // An address for the Browser tab to open once it's up (e.g. the Google sign-in
+  // from the calendar sync warning); cleared once it has been opened.
+  let browserStartAt = $state(null)
+
+  function openInBrowser(url) {
+    browserStartAt = url
+    activeView = 'browser'
+  }
 
   // Household members, deduplicated — several accounts (e.g. two calendars
   // for the same person) can share a person_name.
@@ -104,6 +113,7 @@
       {/if}
       <TimerChips />
       <VoiceButton />
+      <SyncWarning onOpenInBrowser={openInBrowser} />
       <nav class="tabs">
         <button type="button" class:active={activeView === 'calendar'} onclick={() => (activeView = 'calendar')}>
           Calendar
@@ -135,7 +145,11 @@
     {:else if activeView === 'recipes'}
       <RecipeList />
     {:else}
-      <BrowserView onOpenRecipes={() => (activeView = 'recipes')} />
+      <BrowserView
+        onOpenRecipes={() => (activeView = 'recipes')}
+        startAt={browserStartAt}
+        onStarted={() => (browserStartAt = null)}
+      />
     {/if}
   </section>
 </main>

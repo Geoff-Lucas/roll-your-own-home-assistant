@@ -9,6 +9,7 @@ from ..db import engine
 from ..models import Account
 from .caldav_client import fetch_account_ics
 from .ics_parser import parse_ics_resource
+from . import status as sync_status
 from .locks import account_lock
 from .reconciler import reconcile_account_events
 
@@ -38,7 +39,9 @@ def sync_once() -> None:
                     for raw in raw_resources:
                         parsed.extend(parse_ics_resource(raw, account.id, window_start, window_end))
                     reconcile_account_events(session, account.id, parsed, window_start, window_end)
-            except Exception:
+                sync_status.record_success(account.id)
+            except Exception as exc:
+                sync_status.record_failure(account.id, exc)  # shown on screen if it matters (status.py)
                 logger.exception(
                     "CalDAV sync failed for account %s (%s) — will retry next cycle",
                     account.id,

@@ -1,13 +1,14 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from sqlmodel import select
+from sqlmodel import func, select
 
 from ..db import SessionDep
-from ..models import Account
+from ..models import Account, Event
 from ..security.crypto import encrypt
+from ..sync import status as sync_status
 
 router = APIRouter(prefix="/accounts", tags=["accounts"])
 
@@ -42,6 +43,16 @@ def list_accounts(session: SessionDep) -> List[Account]:
     return session.exec(select(Account)).all()
 
 
+@router.get("/sync-problems")
+def list_sync_problems(session: SessionDep) -> List[dict]:
+    """Calendar accounts that aren't syncing and should be shown as such
+    (see app/sync/status.py for which failures count, and when)."""
+    newest = session.exec(select(Event.account_id, func.max(Event.last_synced_at)).group_by(Event.account_id)).all()
+    # Stored as naive UTC (see time_utils.to_naive_utc).
+    last_synced = {account_id: when.replace(tzinfo=timezone.utc) for account_id, when in newest if when}
+    return sync_status.problems(session.exec(select(Account)).all(), last_synced=last_synced)
+
+
 @router.post("", response_model=AccountRead, status_code=201)
 def create_account(payload: AccountCreate, session: SessionDep) -> Account:
     account = Account(
@@ -66,3 +77,4 @@ def delete_account(account_id: int, session: SessionDep) -> None:
         raise HTTPException(status_code=404, detail="Account not found")
     session.delete(account)
     session.commit()
+    sync_status.forget(account_id)

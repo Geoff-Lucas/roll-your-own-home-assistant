@@ -14,7 +14,9 @@
     showBrowser,
   } from './api.js'
 
-  let { onOpenRecipes } = $props()
+  // startAt: an address to open as soon as the browser window is up (then
+  // onStarted is called, so it's opened only once).
+  let { onOpenRecipes, startAt = null, onStarted = () => {} } = $props()
 
   const POLL_MS = 1500
   // The on-screen keyboard slides in over 0.2s; measure after it has landed.
@@ -66,6 +68,11 @@
       }
       browser = await showBrowser(stageRect())
       unavailable = null
+      if (startAt) {
+        const target = startAt
+        onStarted()
+        browser = await navigateBrowser(target)
+      }
     } catch (err) {
       // 503 = this machine can't run the browser window at all; anything else
       // is worth a visible (but dismissable) note.

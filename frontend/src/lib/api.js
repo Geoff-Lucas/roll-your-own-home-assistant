@@ -27,6 +27,10 @@ export function getAccounts() {
   return request('/accounts')
 }
 
+export function getSyncProblems() {
+  return request('/accounts/sync-problems')
+}
+
 export function getEvents(startISO, endISO) {
   const params = new URLSearchParams({ start: startISO, end: endISO })
   return request(`/events?${params}`)

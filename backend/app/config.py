@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     # calendar_write_wait_seconds for a sync to finish before answering 503.
     caldav_timeout_seconds: float = 20.0
     calendar_write_wait_seconds: float = 30.0
+    # A calendar that can't be reached is only flagged on screen once it has
+    # been failing this long (brief outages fix themselves). An expired sign-in
+    # or rejected password is flagged at once. See app/sync/status.py.
+    sync_warning_after_minutes: int = 30
 
     # Weather (see app/weather.py). The location shown is chosen at runtime
     # from the on-screen picker (see app/locations.py); these three only seed
