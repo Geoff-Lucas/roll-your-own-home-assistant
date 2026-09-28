@@ -9,7 +9,7 @@ language-model fallback — see the "Voice assistant" section of PLAN.md.
 from typing import Callable, Optional
 
 from .core import Context, Reply
-from .skills import claude_fallback, clock, timers, weather
+from .skills import claude_fallback, clock, restart, timers, weather
 from .text import normalize, numbers_to_digits
 
 Skill = Callable[[str, Context], Optional[Reply]]
@@ -19,7 +19,7 @@ Skill = Callable[[str, Context], Optional[Reply]]
 # it "declines" (returns None) exactly like the others when a command isn't
 # its kind of thing — here, whenever it isn't turned on — so with it off,
 # nothing below changes.
-SKILLS: tuple[Skill, ...] = (timers.handle, clock.handle, weather.handle, claude_fallback.handle)
+SKILLS: tuple[Skill, ...] = (timers.handle, clock.handle, weather.handle, restart.handle, claude_fallback.handle)
 
 NOT_UNDERSTOOD = "Sorry, I don't know how to help with that yet."
 

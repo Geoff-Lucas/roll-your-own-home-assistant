@@ -35,3 +35,24 @@ def minimize_to_desktop() -> None:
     app's own kiosk window — never the separate Browser-tab window, which
     doesn't have focus while this page does."""
     _run(["xdotool", "getactivewindow", "windowminimize"])
+
+
+# Restarting the computer, for "Hey Jarvis, restart the kiosk" (voice/skills/
+# system.py): it fixed a touchscreen that stopped responding in part of the
+# screen, and voice still works when touch doesn't. The app runs as a normal
+# user, so this needs sudo allowed without a password for `systemctl reboot`
+# (see deploy/README.md); `sudo -n` fails at once rather than waiting for one.
+_REBOOT = ["sudo", "-n", "systemctl", "reboot"]
+
+
+def can_reboot() -> bool:
+    """Whether this machine lets the app reboot it (asks sudo; changes nothing)."""
+    try:
+        result = subprocess.run(["sudo", "-n", "-l", "systemctl", "reboot"], capture_output=True, timeout=5)
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return False
+    return result.returncode == 0
+
+
+def reboot() -> None:
+    _run(_REBOOT)

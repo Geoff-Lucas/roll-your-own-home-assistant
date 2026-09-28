@@ -423,6 +423,28 @@ three things (all verified on this machine, XFCE 4.20 / gvfs 1.57):
   false "Launch Error: Timeout was reached", because this launcher only
   refocuses the *existing* window rather than opening a new one.
 
+### Restarting by voice
+
+"Hey Jarvis, restart the kiosk" (or "reboot the computer", "restart
+yourself", just "restart") asks for confirmation first; saying **"restart
+now"** within 30 seconds (`HOME_ORGANIZER_VOICE_RESTART_CONFIRM_SECONDS`)
+reboots the machine, after saying so. It's for when touch is what's broken — a
+reboot cleared a touchscreen that had stopped responding in its top third.
+"Restart the timer" and the like are left to the timer commands. Turn it off
+with `HOME_ORGANIZER_VOICE_RESTART_ENABLED=false`.
+
+It runs `sudo -n systemctl reboot` as the service's user, so that user needs
+passwordless sudo for that one command. Without it the kiosk answers "I'm not
+allowed to restart this computer" instead of hanging on a password prompt. A
+separate file, so re-running the step-6 line doesn't overwrite it:
+
+```bash
+echo "$USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl reboot" \
+  | sudo tee /etc/sudoers.d/home-organizer-reboot
+```
+
+(Not needed if the user already has `NOPASSWD: ALL`, as `h-asst` does.)
+
 ### The Browser tab
 
 The **Browser** tab in the header shows a real web browser under the toolbar,

@@ -14,6 +14,9 @@ class Reply:
 
     text: str
     understood: bool = True
+    # Something to do once the reply has been said, e.g. "reboot" (see
+    # session.run_action): so "Restarting..." is heard before the screen goes.
+    then: Optional[str] = None
 
 
 @dataclass

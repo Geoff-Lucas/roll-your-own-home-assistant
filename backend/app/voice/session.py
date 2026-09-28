@@ -56,6 +56,17 @@ def understand(text: str) -> Reply:
         return route(text, build_context(session))
 
 
+async def run_action(name: str) -> None:
+    """Carry out a reply's `then`, once the reply has been said."""
+    if name == "reboot":
+        from .. import system as host
+
+        logger.warning("Restarting the computer, as asked by voice")
+        await asyncio.to_thread(host.reboot)
+    else:
+        logger.warning("Unknown reply action %r", name)
+
+
 async def play_ack() -> None:
     """The short "I'm listening" tone after the wake word."""
     await play_and_wait(ack_path())
@@ -71,6 +82,7 @@ class VoiceSession:
         understand_fn: Callable[[str], Reply] = understand,
         ack_fn: Callable[[], Awaitable[None]] = play_ack,
         wake_screen_fn: Callable[[], Awaitable[object]] = wake_display,
+        action_fn: Callable[[str], Awaitable[None]] = run_action,
     ) -> None:
         self.recorder = recorder or Recorder()
         self.transcriber = transcriber or WhisperTranscriber()
@@ -78,6 +90,7 @@ class VoiceSession:
         self._understand = understand_fn
         self._ack = ack_fn
         self._wake_screen = wake_screen_fn
+        self._action = action_fn
         self._stop = asyncio.Event()
         self._task: Optional[asyncio.Task] = None
         # The always-on wake-word listener, if one is running. The microphone can
@@ -231,6 +244,11 @@ class VoiceSession:
                     # The answer is already on screen; a broken voice shouldn't lose it.
                     logger.exception("Couldn't speak the reply")
         self._finish()
+        if reply.then:
+            try:
+                await self._action(reply.then)  # after it's been said: "Restarting..." first
+            except Exception:
+                logger.exception("Couldn't %s", reply.then)
         return reply
 
     async def say_text(self, text: str, speak: bool = True) -> Reply:
