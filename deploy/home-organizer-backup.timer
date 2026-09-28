@@ -1,0 +1,11 @@
+[Unit]
+Description=Nightly Home Organizer backup to the NAS
+
+[Timer]
+OnCalendar=*-*-* 03:30
+# Missed while the kiosk was off: run it soon after the next boot instead.
+Persistent=true
+RandomizedDelaySec=10min
+
+[Install]
+WantedBy=timers.target

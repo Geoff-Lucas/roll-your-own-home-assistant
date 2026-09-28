@@ -1,0 +1,15 @@
+[Unit]
+Description=Home Organizer backup to the NAS
+# A template, like home-organizer.service: deploy/README.md "Backups to the
+# NAS" substitutes the real username for KIOSK_USER when installing it.
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+# Root, because mounting the share needs it; the script only reads the app's data.
+Environment=DATA_DIR=/home/KIOSK_USER/home_organizer/backend/data
+Environment=PYTHON=/home/KIOSK_USER/home_organizer/backend/.venv/bin/python
+ExecStart=/bin/bash /home/KIOSK_USER/home_organizer/deploy/backup-to-nas.sh
+# A NAS that doesn't answer shouldn't leave this running all night.
+TimeoutStartSec=15min

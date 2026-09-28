@@ -445,6 +445,60 @@ echo "$USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl reboot" \
 
 (Not needed if the user already has `NOPASSWD: ALL`, as `h-asst` does.)
 
+### Backups to the NAS
+
+Every night at about 3:30 (or soon after the next boot, if the kiosk was off),
+`deploy/backup-to-nas.sh` copies the kiosk's own data to
+`\\LUCAS-HOME-NAS\Home\home_organizer`:
+
+- `recipes/database/home_organizer-YYYY-MM-DD.db`: the whole app database,
+  one per day, the last 30 kept (`KEEP_DAYS`). It covers recipes, the meal
+  plan, calendars and reminders.
+- `recipes/images/`: recipe photos.
+- `photos/ambient/`: the carousel photos.
+
+Images are only ever added on the NAS, never deleted there. Calendar
+passwords and tokens in the database are encrypted with
+`~/.home_organizer/secret.key`, which is deliberately *not* copied. A restore
+without that key works, but you have to sign in to the calendars again.
+`browser-profile/` (saved web logins) and `voice/` (downloaded models) aren't
+backed up either.
+
+The share is mounted only while the backup runs. A NAS that's down costs one
+missed night: the run fails and says why, and the kiosk carries on. The NAS
+doesn't allow guest access, so it needs a login, kept in a root-only file (on
+the machine):
+
+```bash
+sudo apt install -y cifs-utils
+sudo install -d -m 700 /etc/home-organizer
+sudo install -m 600 /dev/null /etc/home-organizer/nas.credentials
+sudoedit /etc/home-organizer/nas.credentials
+```
+
+containing:
+
+```
+username=<NAS user>
+password=<NAS password>
+```
+
+Then install the timer:
+
+```bash
+for unit in home-organizer-backup.service home-organizer-backup.timer; do
+  sed "s/KIOSK_USER/$USER/g" ~/home_organizer/deploy/$unit | sudo tee /etc/systemd/system/$unit >/dev/null
+done
+sudo systemctl daemon-reload
+sudo systemctl enable --now home-organizer-backup.timer
+sudo systemctl start home-organizer-backup      # one run now, to check it works
+journalctl -u home-organizer-backup -n 5        # "Backed up to ..." or why not
+```
+
+To restore, stop the app first (`sudo systemctl stop home-organizer`). Copy a
+dated `.db` over `backend/data/home_organizer.db` and the image folders back
+into `backend/data/`, then start the app again.
+
 ### The Browser tab
 
 The **Browser** tab in the header shows a real web browser under the toolbar,
