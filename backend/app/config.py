@@ -99,14 +99,10 @@ class Settings(BaseSettings):
     # (see app/voice/skills/claude_fallback.py). Off by default: this is the one
     # place voice leaves the house, as text only, and only once both this and
     # the API key are set. claude-haiku-4-5 answers fast enough for a spoken
-    # reply; claude-sonnet-5 is better for anything that needs real reasoning.
-    # "Hey Jarvis, restart the kiosk", then "restart now" within the window to
-    # confirm (voice/skills/system.py). Needs passwordless `sudo systemctl reboot`.
-    voice_restart_enabled: bool = True
-    voice_restart_confirm_seconds: int = 30
+    # reply; claude-sonnet-5-5 is better for anything that needs real reasoning.
     voice_claude_enabled: bool = False
     voice_claude_api_key: str = ""
-    voice_claude_model: str = "claude-sonnet-5"
+    voice_claude_model: str = "claude-sonnet-5-5"
     voice_claude_timeout_seconds: float = 10.0
     # Lets Claude search the web for questions its training data can't answer
     # (current events, scores, prices...). Off by default: a further step out
@@ -114,6 +110,10 @@ class Settings(BaseSettings):
     # question — and each search Claude runs is billed on top of the reply.
     voice_claude_web_search: bool = False
     voice_claude_web_search_max_uses: int = 3
+    # "Hey Jarvis, restart the kiosk", then "restart now" within the window to
+    # confirm (voice/skills/restart.py). Needs passwordless `sudo systemctl reboot`.
+    voice_restart_enabled: bool = True
+    voice_restart_confirm_seconds: int = 30
 
     @property
     def voice_models_dir(self) -> Path:

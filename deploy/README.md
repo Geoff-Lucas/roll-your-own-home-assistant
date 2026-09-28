@@ -257,7 +257,7 @@ the weather (see `backend/app/voice/skills/`). Pieces, and how to set each up:
   ```
 
   `HOME_ORGANIZER_VOICE_CLAUDE_MODEL` picks the model (default
-  `claude-sonnet-5`; `claude-haiku-4-5-20251001` answers faster and is cheaper,
+  `claude-sonnet-5-5`; `claude-haiku-4-5-20251001` answers faster and is cheaper,
   worth it if the reply's latency matters more than its polish — this is a
   kiosk reply, not a chat). Replies are capped short (one or two spoken
   sentences) and there's no conversation memory yet — every question is
