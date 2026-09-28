@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Home Organizer Privacy Policy</title>
+<style>
+  :root { --bg: #fdfbf7; --text: #2b2622; --muted: #6b625a; --accent: #a4481f; --rule: #e6ded3; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #1d1a17; --text: #ece6de; --muted: #a79d92; --accent: #e8905f; --rule: #3a342e; }
+  }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 17px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 42rem; margin: 0 auto; padding: 2.5rem 16px 4rem; }
+  h1 { font-size: 1.8rem; margin: 0 0 .25rem; }
+  h2 { font-size: 1.15rem; margin: 2rem 0 .5rem; padding-top: 1rem; border-top: 1px solid var(--rule); }
+  .updated { color: var(--muted); margin: 0 0 1.5rem; }
+  a { color: var(--accent); }
+  li { margin: .3rem 0; }
+</style>
+</head>
+<body>
+<main>
+<h1>Home Organizer Privacy Policy</h1>
+<p class="updated">Last updated: September 28, 2026</p>
+
+<p>Home Organizer is a self-hosted household kiosk: a touchscreen in one home
+that shows the family calendar, recipes, meal plans, timers and the weather.
+It is run privately by one household for its own members. It is not a public
+service, it has no user accounts of its own, and it doesn't sell, rent or share
+anyone's data. Its source code is public at
+<a href="https://github.com/Geoff-Lucas/roll-your-own-home-assistant">github.com/Geoff-Lucas/roll-your-own-home-assistant</a>.</p>
+
+<h2>Google Calendar data</h2>
+<p>When a household member signs in with Google, Home Organizer asks for
+access to their Google Calendar (and their email address, to find the right
+calendar). It uses that access only to:</p>
+<ul>
+  <li>show that person's calendar events on the kiosk screen, and</li>
+  <li>add, change or delete events when they do so from the kiosk.</li>
+</ul>
+<p>Events are copied to the kiosk itself so the screen works without waiting
+on the internet. That copy stays on the kiosk and the household's own backup
+drive, and is refreshed from Google every few minutes. The sign-in token is
+stored encrypted on the kiosk. Calendar data is never sent to any other
+company or service, never used for advertising, and never used to train AI
+models.</p>
+<p>Home Organizer's use and transfer of information received from Google APIs
+adheres to the
+<a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>,
+including the Limited Use requirements.</p>
+
+<h2>Voice commands</h2>
+<p>Speech is turned into text on the kiosk itself; no audio is recorded or
+sent anywhere. Everyday commands (timers, the time, the weather, restarting
+the kiosk) are handled on the kiosk. For a question it can't answer itself,
+the kiosk may send the <em>text</em> of that question to Anthropic's Claude
+service, along with the local time, the town name and the current weather, to
+get an answer. Anthropic may run a web search to answer it. No calendar data,
+recipes or sign-in details are ever included.</p>
+
+<h2>Other information</h2>
+<ul>
+  <li><strong>Recipes and meal plans</strong> are kept on the kiosk. Importing
+    a recipe from a web address fetches that page.</li>
+  <li><strong>Weather</strong> is looked up for the household's town from a
+    public weather service.</li>
+  <li><strong>Backups</strong> of the kiosk's data go only to a storage drive
+    inside the same home.</li>
+</ul>
+
+<h2>Removing access and data</h2>
+<p>Anyone who linked their Google account can remove Home Organizer's access
+at any time at
+<a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.
+The kiosk then stops syncing, and removing the account from the kiosk
+deletes its copied events and its stored sign-in.</p>
+
+<h2>Changes and contact</h2>
+<p>If this policy changes, the updated version will be posted on this page
+with a new date. Questions can be raised by
+<a href="https://github.com/Geoff-Lucas/roll-your-own-home-assistant/issues">opening an issue on the project's GitHub page</a>.</p>
+</main>
+</body>
+</html>
