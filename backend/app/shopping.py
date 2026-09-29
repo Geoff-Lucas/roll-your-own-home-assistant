@@ -182,3 +182,14 @@ def build_mailto(entries: Sequence[str], header: str, to: str = "", limit: int =
         if len(link) <= limit:
             return link, included
     return link, 0
+
+
+# Things nobody needs reminding to buy: left out of the phone message unless asked for.
+_SEASONING_WORDS = {"salt", "pepper", "kosher", "sea", "black", "white", "ground", "freshly", "cracked", "table", "coarse", "flaky", "fine", "and"}
+
+
+def is_staple(name: str) -> bool:
+    """Salt and pepper, however a recipe words them ("kosher salt", "freshly ground black
+    pepper", "salt and pepper"), but not "bell peppers" or "red pepper flakes"."""
+    words = set(normalize_name(name).split())
+    return bool(words & {"salt", "pepper"}) and words <= _SEASONING_WORDS

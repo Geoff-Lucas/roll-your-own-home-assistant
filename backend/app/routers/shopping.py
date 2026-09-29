@@ -10,7 +10,7 @@ from sqlmodel import select
 from ..config import settings
 from ..db import SessionDep
 from ..models import MealPlan, Recipe, ShoppingItem
-from ..shopping import build_lines, build_mailto, list_entries
+from ..shopping import build_lines, build_mailto, is_staple, list_entries
 from ..time_utils import local_today, week_bounds
 
 router = APIRouter(prefix="/shopping-list", tags=["shopping-list"])
@@ -37,10 +37,24 @@ class ShoppingListRead(BaseModel):
     items: List[ShoppingItemRead]
 
 
+class ShareRequest(BaseModel):
+    # Keys of the items to leave out of the message. Leave it out altogether for the
+    # starting choice (salt and pepper out, everything else in); [] means "leave nothing out".
+    exclude: Optional[List[str]] = None
+
+
+class ShareItem(BaseModel):
+    key: str
+    name: str
+    quantity: str
+    included: bool
+
+
 class ShareRead(BaseModel):
-    qr: Optional[str]  # an SVG image as a data: URI; None when there's nothing left to buy
-    included: int  # how many items the message holds
-    left_out: int  # how many didn't fit (a very long list); the message says so too
+    items: List[ShareItem]  # everything still to buy, each marked as in the message or not
+    qr: Optional[str]  # an SVG image as a data: URI; None when nothing is in the message
+    included: int  # how many items the message holds (fewer than those marked, if it's too long)
+    left_out: int  # marked items that didn't fit (a very long list); the message says so too
 
 
 class CheckedSet(BaseModel):
@@ -103,19 +117,35 @@ def get_shopping_list(session: SessionDep) -> ShoppingListRead:
     return _build_list(session)
 
 
-@router.get("/share", response_model=ShareRead)
-def share_shopping_list(session: SessionDep) -> ShareRead:
+@router.post("/share", response_model=ShareRead)
+def share_shopping_list(session: SessionDep, payload: Optional[ShareRequest] = None) -> ShareRead:
     """A QR code that opens an email with what's left to buy, for a phone to scan.
-    Ticked items are left out: they're already in the trolley."""
+
+    Ticked items are already in the trolley, so they're not offered. Of the rest, the
+    caller picks what goes in the message (`exclude`); with no choice made yet, everything
+    goes in except salt and pepper, which nobody needs telling to buy. Items typed in by
+    hand are never assumed to be staples."""
     current = _build_list(session)
     todo = [item for item in current.items if not item.checked]
-    if not todo:
-        return ShareRead(qr=None, included=0, left_out=0)
+
+    if payload is None or payload.exclude is None:
+        excluded = {item.key for item in todo if not item.manual and is_staple(item.name)}
+    else:
+        excluded = set(payload.exclude)
+    chosen = [item for item in todo if item.key not in excluded]
+    items = [ShareItem(key=i.key, name=i.name, quantity=i.quantity, included=i.key not in excluded) for i in todo]
+    if not chosen:
+        return ShareRead(items=items, qr=None, included=0, left_out=0)
 
     header = f"Shopping list, {current.start:%b} {current.start.day} - {current.end:%b} {current.end.day}"
-    link, included = build_mailto(list_entries((i.name, i.quantity) for i in todo), header, settings.shopping_email_to)
+    link, included = build_mailto(list_entries((i.name, i.quantity) for i in chosen), header, settings.shopping_email_to)
     code = segno.make(link, error="l", micro=False)
-    return ShareRead(qr=code.svg_data_uri(scale=1, border=4, dark="#000", light="#fff"), included=included, left_out=len(todo) - included)
+    return ShareRead(
+        items=items,
+        qr=code.svg_data_uri(scale=1, border=4, dark="#000", light="#fff"),
+        included=included,
+        left_out=len(chosen) - included,
+    )
 
 
 @router.put("/checked", status_code=204)

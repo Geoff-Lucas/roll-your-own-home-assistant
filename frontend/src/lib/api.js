@@ -139,8 +139,10 @@ export function getShoppingList() {
   return request('/shopping-list')
 }
 
-export function getShoppingShare() {
-  return request('/shopping-list/share')
+/** The phone message's QR code and the items it offers. `exclude` is the keys to leave out;
+ * left alone, the server makes the starting choice (everything but salt and pepper). */
+export function getShoppingShare(exclude = null) {
+  return requestJson('/shopping-list/share', 'POST', exclude === null ? {} : { exclude })
 }
 
 export function setShoppingChecked(key, checked) {

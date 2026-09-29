@@ -37,6 +37,13 @@ def setup(monkeypatch):
         session.add(Recipe(id=1, title="Tacos", ingredients=[item("yellow onion", "1"), item("ground beef", "1 lb")]))
         session.add(Recipe(id=2, title="Pot roast", ingredients=[item("yellow onion", "2"), item("chuck roast", "3 lb")]))
         session.add(Recipe(id=3, title="Pasta", ingredients=[item("spaghetti", "1 lb")]))
+        session.add(
+            Recipe(
+                id=4,
+                title="Steak night",
+                ingredients=[item("steak", "2 lb"), item("kosher salt", "1 tsp"), item("freshly ground black pepper"), item("bell peppers", "2")],
+            )
+        )
         session.commit()
 
     def plan(day: date, recipe_id: int):
@@ -156,6 +163,15 @@ def sent(monkeypatch):
     return seen
 
 
+def share(client, exclude="default"):
+    """Ask for the phone message; `exclude` left alone is the starting choice."""
+    return client.post("/shopping-list/share", json={} if exclude == "default" else {"exclude": exclude}).json()
+
+
+def by_name(body):
+    return {entry["name"]: entry["included"] for entry in body["items"]}
+
+
 def test_the_qr_code_carries_what_is_left_to_buy(setup, sent, monkeypatch):
     client, _, plan, _ = setup
     monkeypatch.setattr(shopping_module.settings, "shopping_email_to", "me@example.com")
@@ -165,25 +181,69 @@ def test_the_qr_code_carries_what_is_left_to_buy(setup, sent, monkeypatch):
     onion = next(i["key"] for i in client.get("/shopping-list").json()["items"] if i["name"] == "yellow onion")
     client.put("/shopping-list/checked", json={"key": onion, "checked": True})
 
-    body = client.get("/shopping-list/share").json()
+    body = share(client)
 
     assert body["qr"].startswith("data:image/svg+xml")
     assert (body["included"], body["left_out"]) == (3, 0)
-    # Ticked items are already in the trolley, so they're not in the message; hand-added ones are.
+    # Ticked items are already in the trolley, so they're neither offered nor in the message.
+    assert by_name(body) == {"chuck roast": True, "ground beef": True, "paper towels": True}
     assert sent["entries"] == ["- Chuck roast: 3 lb", "- Ground beef: 1 lb", "- Paper towels"]
     assert sent["header"] == "Shopping list, Sep 23 - Sep 26"
     assert sent["to"] == "me@example.com"
 
 
-def test_with_everything_ticked_or_nothing_planned_there_is_no_code(setup):
+def test_salt_and_pepper_start_out_left_off_the_message(setup, sent):
     client, _, plan, _ = setup
-    assert client.get("/shopping-list/share").json() == {"qr": None, "included": 0, "left_out": 0}
+    plan(date(2026, 9, 23), 4)
+
+    body = share(client)
+
+    # Offered, so they can be put back, but not ticked to begin with. Bell peppers aren't pepper.
+    assert by_name(body) == {"steak": True, "kosher salt": False, "freshly ground black pepper": False, "bell peppers": True}
+    assert sent["entries"] == ["- Bell peppers: 2", "- Steak: 2 lb"]
+    assert body["included"] == 2
+
+
+def test_anything_can_be_put_back_or_dropped(setup, sent):
+    client, _, plan, _ = setup
+    plan(date(2026, 9, 23), 4)
+    keys = {entry["name"]: entry["key"] for entry in share(client)["items"]}
+
+    everything = share(client, exclude=[])  # an empty choice means leave nothing out, salt included
+    assert all(by_name(everything).values()) and everything["included"] == 4
+
+    no_steak = share(client, exclude=[keys["steak"]])  # a choice replaces the starting one: salt is back in
+    assert by_name(no_steak) == {"steak": False, "kosher salt": True, "freshly ground black pepper": True, "bell peppers": True}
+    assert "- Steak: 2 lb" not in sent["entries"] and "- Kosher salt: 1 tsp" in sent["entries"]
+
+
+def test_something_typed_in_by_hand_is_never_taken_for_a_staple(setup):
+    client, *_ = setup
+    client.post("/shopping-list/manual", json={"name": "salt"})
+
+    assert by_name(share(client)) == {"salt": True}
+
+
+def test_with_nothing_chosen_there_is_no_code_but_the_items_are_still_offered(setup):
+    client, _, plan, _ = setup
+    plan(date(2026, 9, 23), 3)
+    key = client.get("/shopping-list").json()["items"][0]["key"]
+
+    body = share(client, exclude=[key])
+
+    assert body["qr"] is None and (body["included"], body["left_out"]) == (0, 0)
+    assert by_name(body) == {"spaghetti": False}
+
+
+def test_with_everything_ticked_or_nothing_planned_there_is_nothing_to_offer(setup):
+    client, _, plan, _ = setup
+    assert share(client) == {"items": [], "qr": None, "included": 0, "left_out": 0}
 
     plan(date(2026, 9, 23), 3)
     key = client.get("/shopping-list").json()["items"][0]["key"]
     client.put("/shopping-list/checked", json={"key": key, "checked": True})
 
-    assert client.get("/shopping-list/share").json()["qr"] is None
+    assert share(client)["items"] == []
 
 
 def test_a_very_long_list_still_gives_a_code_and_says_what_it_left_out(setup):
@@ -193,9 +253,10 @@ def test_a_very_long_list_still_gives_a_code_and_says_what_it_left_out(setup):
         session.commit()
     plan(date(2026, 9, 23), 9)
 
-    body = client.get("/shopping-list/share").json()
+    body = share(client)
 
     assert body["qr"].startswith("data:image/svg+xml")
+    assert len(body["items"]) == 150  # all offered; the message holds as many as fit
     assert body["left_out"] > 0 and body["included"] + body["left_out"] == 150
 
 

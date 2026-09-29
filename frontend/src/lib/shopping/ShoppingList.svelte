@@ -12,17 +12,36 @@
   let list = $state(null)
   let error = $state(null)
   let newItem = $state('')
-  let sharing = $state(null) // the QR code for the phone, while it's on screen
+  let sharing = $state(null) // the phone message, while it's on screen: its QR code and the items offered
+  let latestShare = 0
 
   const items = $derived(list ? ordered(list.items) : [])
 
   // A QR code that opens an email with what's left to buy; scanning it with a phone's
-  // camera is all it takes, and nothing is sent from here.
+  // camera is all it takes, and nothing is sent from here. What goes in it starts as
+  // everything except salt and pepper (the server's choice), and each item can be ticked
+  // in or out, the code following along.
   async function share() {
     try {
       sharing = await getShoppingShare()
       error = null
     } catch (err) {
+      error = err.message
+    }
+  }
+
+  async function pick(item) {
+    item.included = !item.included
+    const asked = ++latestShare
+    try {
+      const updated = await getShoppingShare(sharing.items.filter((other) => !other.included).map((other) => other.key))
+      if (asked !== latestShare) return // a later tap has already asked again
+      sharing.qr = updated.qr
+      sharing.included = updated.included
+      sharing.left_out = updated.left_out
+      error = null
+    } catch (err) {
+      item.included = !item.included
       error = err.message
     }
   }
@@ -76,17 +95,41 @@
   {#if sharing}
     <div class="modal wide" role="dialog" aria-modal="true" aria-label="Send to phone" onclick={(e) => e.stopPropagation()}>
       <h3>Send to phone</h3>
-      {#if sharing.qr}
-        <p class="summary">Point your phone's camera at this. It opens an email with the list, ready to send.</p>
-        <img class="qr" src={sharing.qr} alt="A QR code that opens an email with the shopping list" />
-        {#if sharing.left_out > 0}
-          <p class="note">
-            The list was too long for one code: the email has the first {sharing.included} items and says {sharing.left_out} more
-            are on the kiosk.
-          </p>
-        {/if}
-      {:else}
+      {#if sharing.items.length === 0}
         <p class="summary">There's nothing left to buy, so there's nothing to send.</p>
+      {:else}
+        <p class="summary">Untick anything you don't want in the email, then point your phone's camera at the code.</p>
+        {#if error}
+          <p class="error">{error}</p>
+        {/if}
+        <div class="share">
+          <div class="code">
+            {#if sharing.qr}
+              <img class="qr" src={sharing.qr} alt="A QR code that opens an email with the shopping list" />
+              {#if sharing.left_out > 0}
+                <p class="note">
+                  Too long for one code: the email has the first {sharing.included} items and says {sharing.left_out} more are on
+                  the kiosk.
+                </p>
+              {/if}
+            {:else}
+              <p class="nothing">Nothing is ticked, so there's nothing to send.</p>
+            {/if}
+          </div>
+          <ul class="picks">
+            {#each sharing.items as item (item.key)}
+              <li class:excluded={!item.included}>
+                <button type="button" class="row" aria-pressed={item.included} onclick={() => pick(item)}>
+                  <span class="tick" aria-hidden="true">{item.included ? '✓' : ''}</span>
+                  <span class="line">
+                    <span class="name">{item.name}</span>
+                    {#if item.quantity}<span class="quantity">{item.quantity}</span>{/if}
+                  </span>
+                </button>
+              </li>
+            {/each}
+          </ul>
+        </div>
       {/if}
       <button type="button" class="close" onclick={() => (sharing = null)}>Back to the list</button>
     </div>
@@ -325,10 +368,53 @@
 
   /* The code is dense on a full list, so it's drawn as big as the screen allows. */
   .modal.wide {
-    width: min(94vw, 64rem);
+    width: min(96vw, 76rem);
     max-height: 90vh;
     align-items: center;
     text-align: center;
+  }
+
+  /* The code on one side, what goes in the email on the other. */
+  .share {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+    align-items: start;
+    align-self: stretch;
+    min-height: 0;
+  }
+
+  .code {
+    min-width: 0;
+  }
+
+  .nothing {
+    margin: 4rem 0;
+    font-size: 1.2rem;
+    opacity: 0.65;
+  }
+
+  .picks {
+    text-align: left;
+    max-height: 62vh;
+  }
+
+  /* In the email: a green tick. Left out: an empty circle, and the line struck through. */
+  .picks li:not(.excluded) .tick {
+    background: #2e9e5b;
+    border-color: #2e9e5b;
+  }
+
+  .picks li.excluded .name,
+  .picks li.excluded .quantity {
+    text-decoration: line-through;
+    opacity: 0.5;
+  }
+
+  @media (max-width: 900px) {
+    .share {
+      grid-template-columns: 1fr;
+    }
   }
 
   .modal.wide .close {
@@ -336,7 +422,7 @@
   }
 
   .qr {
-    width: min(100%, 60vh);
+    width: min(100%, 55vh);
     aspect-ratio: 1;
     margin: 0.25rem 0;
     image-rendering: crisp-edges;

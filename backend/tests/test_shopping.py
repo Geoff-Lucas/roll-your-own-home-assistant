@@ -4,7 +4,7 @@ from urllib.parse import parse_qs, unquote, urlsplit
 import pytest
 import segno
 
-from app.shopping import MAILTO_LIMIT, build_lines, build_mailto, format_amount, list_entries, normalize_name, parse_quantity
+from app.shopping import MAILTO_LIMIT, build_lines, build_mailto, format_amount, is_staple, list_entries, normalize_name, parse_quantity
 
 
 def ingredient(name, quantity=None):
@@ -200,3 +200,23 @@ def test_the_biggest_message_still_makes_a_code_a_phone_can_read():
     code = segno.make(link, error="l", micro=False)
 
     assert code.version <= 31  # 141 modules across: dense, which is why the kiosk shows it large
+
+
+# --- salt and pepper -----------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["salt", "Salt", "pepper", "salt pepper", "Salt & Pepper", "kosher salt", "sea salt", "black pepper", "white pepper",
+     "freshly ground black pepper", "coarse kosher salt"],
+)  # fmt: skip
+def test_salt_and_pepper_are_staples_however_a_recipe_words_them(name):
+    assert is_staple(name)
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["bell peppers", "red pepper flakes", "cayenne pepper", "pepper jack cheese", "peppercorns", "salted butter", "salt cod", "peanut butter", "garlic salt"],
+)  # fmt: skip
+def test_anything_else_with_pepper_or_salt_in_its_name_is_not(name):
+    assert not is_staple(name)
