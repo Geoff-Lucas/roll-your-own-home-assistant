@@ -135,6 +135,22 @@ export function setMealPlan(planDate, recipeId) {
   return requestJson(`/meal-plan/${planDate}`, 'PUT', { recipe_id: recipeId })
 }
 
+export function getShoppingList() {
+  return request('/shopping-list')
+}
+
+export function setShoppingChecked(key, checked) {
+  return requestJson('/shopping-list/checked', 'PUT', { key, checked })
+}
+
+export function addShoppingItem(name) {
+  return requestJson('/shopping-list/manual', 'POST', { name })
+}
+
+export function removeShoppingItem(key) {
+  return request(`/shopping-list/manual/${encodeURIComponent(key)}`, { method: 'DELETE' })
+}
+
 export function getBrowserState() {
   return request('/browser/state')
 }

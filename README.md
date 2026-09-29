@@ -30,8 +30,11 @@ card or gift"). Any event can be flagged by hand, too.
 **Recipes and meal plan.** Paste a link and it imports the recipe from
 hundreds of sites, or type one in by hand. Each person has their own
 favorites; ingredients are split into quantity and name, with dietary tags and
-allergens, so a shopping list can be built from them later. A week planner puts
-dinners on the calendar page.
+allergens. A week planner puts dinners on the calendar page, and from it the
+kiosk builds the **shopping list** for the rest of the week: the same
+ingredient across meals on one line with the amounts added up ("1 1/2 lb" and
+"1 lb" become "2 1/2 lb"), each showing which meals need it. Tap to tick things
+off, and add anything else by hand.
 
 **Timers, alarms and a stopwatch.** They tick in the header and ring through
 the speakers whatever the screen is showing, and they survive restarts.
@@ -60,6 +63,9 @@ carousel and dims overnight; touch, or a voice command, brings it back.
     <td align="center"><img src="docs/screenshots/editor.png" alt="Typing in a recipe with the on-screen keyboard" width="300"><br>Typing a recipe in, on the built-in keyboard</td>
     <td align="center"><img src="docs/screenshots/timers.png" alt="The timers panel" width="300"><br>Timers, alarms and stopwatch</td>
     <td align="center"><img src="docs/screenshots/voice.png" alt="A spoken exchange on screen" width="300"><br>A voice exchange, shown on screen</td>
+  </tr>
+  <tr>
+    <td colspan="3" align="center"><img src="docs/screenshots/shopping.png" alt="The shopping list built from the week's meals" width="300"><br>The shopping list for the week's meals: amounts added up, ticked items at the bottom</td>
   </tr>
 </table>
 
@@ -148,9 +154,9 @@ the time, town and weather, and never calendar data or recipes. See the
 ## Status
 
 This is a personal project that runs in one home every day, not a packaged
-product, so expect to read some code to set it up. What's next is a shopping
-list built from the week's meal plan, more voice commands (reading the
-calendar, adding events), and a phone app for browsing recipes. The reasoning
+product, so expect to read some code to set it up. What's next is more voice
+commands (reading the calendar, adding events, "add milk to the list"), and a
+phone app for browsing recipes and carrying the shopping list. The reasoning
 behind these choices, and what's been decided, is in [`PLAN.md`](PLAN.md).
 
 ## License

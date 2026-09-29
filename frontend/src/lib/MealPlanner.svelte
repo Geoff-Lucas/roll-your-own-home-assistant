@@ -1,7 +1,9 @@
 <script>
   import { onMount } from 'svelte'
   import { getMealPlan, getRecipes, setMealPlan } from './api.js'
+  import ShoppingList from './shopping/ShoppingList.svelte'
 
+  let shoppingOpen = $state(false)
   let entries = $state([])
   let recipes = $state([])
   let error = $state(null)
@@ -45,7 +47,10 @@
 </script>
 
 <div class="panel">
-  <h3>This week's meals</h3>
+  <div class="heading">
+    <h3>This week's meals</h3>
+    <button type="button" class="shopping" onclick={() => (shoppingOpen = true)}>🛒 Shopping list</button>
+  </div>
   {#if error}
     <p class="error">{error}</p>
   {/if}
@@ -67,6 +72,10 @@
     {/each}
   </ul>
 </div>
+
+{#if shoppingOpen}
+  <ShoppingList onClose={() => (shoppingOpen = false)} />
+{/if}
 
 {#if pickerDate}
   <div class="overlay" role="presentation" onclick={() => (pickerDate = null)}>
@@ -101,9 +110,26 @@
     overflow: hidden;
   }
 
-  h3 {
-    margin: 0 0 0.5rem;
+  .heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
     flex-shrink: 0;
+  }
+
+  h3 {
+    margin: 0;
+  }
+
+  .shopping {
+    padding: 0.45rem 0.9rem;
+    font-size: 1.05rem;
+    border: 1px solid #ccc;
+    border-radius: 0.4rem;
+    background: #f5f5f5;
+    cursor: pointer;
   }
 
   /* One row a day, top to bottom: the day, then the meal across the rest of the row.

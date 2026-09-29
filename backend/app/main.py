@@ -27,6 +27,7 @@ from .routers import (
     meal_plan,
     recipes,
     reminders,
+    shopping,
     system,
     timers,
     voice,
@@ -116,6 +117,7 @@ app.include_router(voice.router, prefix="/api")
 app.include_router(ambient.router, prefix="/api")
 app.include_router(reminders.router, prefix="/api")
 app.include_router(meal_plan.router, prefix="/api")
+app.include_router(shopping.router, prefix="/api")
 app.include_router(google_oauth.router, prefix="/api")
 app.include_router(system.router, prefix="/api")
 

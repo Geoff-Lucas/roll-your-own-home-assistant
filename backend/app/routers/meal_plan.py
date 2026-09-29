@@ -7,7 +7,7 @@ from sqlmodel import select
 
 from ..db import SessionDep
 from ..models import MealPlan, Recipe
-from ..time_utils import local_today
+from ..time_utils import local_today, week_bounds
 
 router = APIRouter(prefix="/meal-plan", tags=["meal-plan"])
 
@@ -26,9 +26,7 @@ class MealPlanSet(BaseModel):
 
 
 def _current_week_bounds() -> Tuple[date, date]:
-    today = local_today()  # the household's date, in its timezone setting
-    start = today - timedelta(days=(today.weekday() + 1) % 7)  # back up to the most recent Sunday
-    return start, start + timedelta(days=6)
+    return week_bounds(local_today())  # the household's date, in its timezone setting
 
 
 def _entry_for(session, plan_date: date, recipe_id: Optional[int]) -> MealPlanEntry:

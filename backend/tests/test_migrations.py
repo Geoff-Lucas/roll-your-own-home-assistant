@@ -10,7 +10,7 @@ from sqlmodel import SQLModel, create_engine
 
 from app import db
 
-ALL_TABLES = {"account", "event", "location", "mealplan", "recipe", "recipefavorite", "timer"}
+ALL_TABLES = {"account", "event", "location", "mealplan", "recipe", "recipefavorite", "shoppingitem", "timer"}
 
 
 @pytest.fixture

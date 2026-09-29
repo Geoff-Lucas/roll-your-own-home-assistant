@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone, tzinfo
+from datetime import date, datetime, timedelta, timezone, tzinfo
 from zoneinfo import ZoneInfo
 
 import tzlocal
@@ -21,6 +21,12 @@ def local_date(naive_utc: datetime) -> date:
 
 def local_today() -> date:
     return datetime.now(local_tz()).date()
+
+
+def week_bounds(day: date) -> tuple[date, date]:
+    """The Sunday-to-Saturday week containing `day`: the meal planner's week."""
+    start = day - timedelta(days=(day.weekday() + 1) % 7)  # back up to the most recent Sunday
+    return start, start + timedelta(days=6)
 
 
 def to_naive_utc(value: datetime) -> datetime:
