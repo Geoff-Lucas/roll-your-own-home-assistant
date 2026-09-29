@@ -106,12 +106,15 @@
     flex-shrink: 0;
   }
 
+  /* One row a day, top to bottom: the day, then the meal across the rest of the row.
+     (Seven narrow columns cut names off: "Weeknight chicken fajitas".) */
   .days {
     list-style: none;
     margin: 0;
     padding: 0;
     display: flex;
-    gap: 0.5rem;
+    flex-direction: column;
+    gap: 0.4rem;
     flex: 1;
     min-height: 0;
   }
@@ -119,50 +122,57 @@
   .days li {
     flex: 1;
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.3rem;
+    align-items: stretch;
+    gap: 0.75rem;
     min-width: 0;
+    min-height: 0;
   }
 
   .day-label {
-    font-size: 1.05rem;
+    flex: 0 0 3.25rem;
+    align-self: center;
+    font-size: 1.15rem;
     font-weight: 600;
     opacity: 0.7;
   }
 
   .meal {
     flex: 1;
-    width: 100%;
+    min-width: 0;
     display: flex;
-    flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 0.3rem;
+    justify-content: flex-start;
+    gap: 0.75rem;
     border: 1px solid #ddd;
     border-radius: 0.4rem;
     background: #fafafa;
     cursor: pointer;
-    padding: 0.3rem;
+    padding: 0.3rem 0.75rem;
     overflow: hidden;
+    text-align: left;
   }
 
   .meal img {
-    width: 100%;
-    height: 8rem;
+    flex: 0 0 auto;
+    width: 4.5rem;
+    height: 100%;
     object-fit: cover;
     border-radius: 0.3rem;
   }
 
   .meal-title {
-    font-size: 1rem;
-    text-align: center;
-    line-height: 1.15;
+    font-size: 1.2rem;
+    line-height: 1.2;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
   }
 
   .meal.empty {
     color: #999;
-    font-size: 1rem;
+    font-size: 1.1rem;
   }
 
   .error {

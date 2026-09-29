@@ -305,7 +305,7 @@
   .below-calendar {
     display: flex;
     gap: 1rem;
-    flex: 0 0 25vh; /* bottom quarter of the screen */
+    flex: 0 0 35vh; /* the bottom third or so: room for a week of meals, one a row */
   }
 
   .below-calendar > :global(*) {
