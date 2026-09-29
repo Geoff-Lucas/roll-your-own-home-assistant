@@ -177,3 +177,61 @@ def test_update_event_recomputes_recurrence_id_when_time_changes(setup):
     ).json()
 
     assert updated["recurrence_id"] == "2026-07-16T09:00:00"
+
+
+# --- times: stored as UTC, marked as UTC on the way out ------------------------
+
+
+def test_times_leave_the_api_marked_as_utc(setup):
+    client, _, _ = setup
+    created = client.post("/events", json=make_event_payload()).json()
+
+    # Without the marker a browser reads "14:00:00" on its own clock, and an
+    # event at 10 AM Eastern was drawn at 2 PM.
+    assert created["start_time"] == "2026-07-15T14:00:00Z"
+    listed = client.get("/events").json()[0]
+    assert listed["start_time"] == "2026-07-15T14:00:00Z"
+    assert listed["end_time"] == "2026-07-15T15:00:00Z"
+    assert listed["last_synced_at"].endswith("Z")
+
+
+def test_a_time_with_an_offset_is_stored_as_that_instant_in_utc(setup):
+    client, engine, caldav_calls = setup
+    res = client.post(
+        "/events",
+        json=make_event_payload(
+            start_time="2026-10-01T09:00:00-04:00", end_time="2026-10-01T10:00:00-04:00", timezone="America/New_York"
+        ),
+    )
+
+    assert res.json()["start_time"] == "2026-10-01T13:00:00Z"
+    with Session(engine) as session:
+        row = session.get(Event, res.json()["id"])
+        assert row.start_time == datetime(2026, 10, 1, 13, 0)  # naive UTC, as ever
+    # ...and Google is told 9 AM Eastern, not 9 AM UTC.
+    assert "DTSTART;TZID=America/New_York:20261001T090000" in caldav_calls["created_ical"]
+
+
+def test_editing_with_an_offset_time_moves_the_event_to_the_right_instant(setup):
+    client, _, caldav_calls = setup
+    created = client.post("/events", json=make_event_payload()).json()
+
+    res = client.patch(
+        f"/events/{created['id']}",
+        json={"start_time": "2026-07-15T18:30:00-04:00", "end_time": "2026-07-15T19:30:00-04:00", "timezone": "America/New_York"},
+    )
+
+    assert res.json()["start_time"] == "2026-07-15T22:30:00Z"
+    assert "DTSTART;TZID=America/New_York:20260715T183000" in caldav_calls["updated_ical"]
+
+
+def test_a_window_given_with_offsets_is_read_as_instants(setup):
+    client, _, _ = setup
+    client.post("/events", json=make_event_payload(start_time="2026-10-01T09:00:00-04:00", end_time="2026-10-01T10:00:00-04:00"))
+
+    # 9 AM Eastern is 13:00 UTC: after 8 AM Eastern, so outside a window that ends then.
+    before = client.get("/events", params={"start": "2026-10-01T00:00:00-04:00", "end": "2026-10-01T08:00:00-04:00"})
+    during = client.get("/events", params={"start": "2026-10-01T08:00:00-04:00", "end": "2026-10-01T12:00:00-04:00"})
+
+    assert before.json() == []
+    assert len(during.json()) == 1

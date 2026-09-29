@@ -1,7 +1,7 @@
 from datetime import date, datetime, timezone
 from typing import Optional
 
-from pydantic import ConfigDict, field_validator
+from pydantic import ConfigDict, field_serializer, field_validator
 from sqlmodel import Field, SQLModel
 
 from ..time_utils import to_naive_utc
@@ -83,3 +83,10 @@ class Event(SQLModel, table=True):
         if isinstance(value, str):
             value = datetime.fromisoformat(value)
         return to_naive_utc(value)
+
+    # Over the API these are marked as UTC ("...Z"). Without the marker a browser
+    # reads "13:00:00" as 13:00 on its own clock, and an event at 9:00 AM Eastern
+    # showed up at 1:00 PM. JSON only: the database and Python keep naive UTC.
+    @field_serializer("start_time", "end_time", "last_synced_at", when_used="json")
+    def _mark_as_utc(self, value: Optional[datetime]) -> Optional[str]:
+        return None if value is None else value.isoformat() + "Z"

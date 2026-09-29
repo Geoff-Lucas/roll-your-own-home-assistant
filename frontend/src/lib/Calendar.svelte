@@ -7,6 +7,7 @@
   import interactionPlugin from '@fullcalendar/interaction'
   import { createEvent, deleteEvent, getEvents, updateEvent } from './api.js'
   import EventModal from './EventModal.svelte'
+  import { formatDateInput, formatDateTimeInput } from './eventTime.js'
 
   // FullCalendar has no official Svelte binding — this wraps the vanilla
   // JS Calendar class directly onto a DOM node, per FullCalendar's own
@@ -58,19 +59,9 @@
     }
   }
 
-  // Deliberately naive about timezones, matching EventModal: these read the
-  // *local* wall-clock components of the Date FullCalendar hands back, with
-  // no UTC conversion, since the backend's naive-but-UTC convention treats
-  // whatever string is typed as-is. Fine for a single-timezone household.
-  function pad(n) {
-    return String(n).padStart(2, '0')
-  }
-  function formatDateInput(date) {
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
-  }
-  function formatDateTimeInput(date) {
-    return `${formatDateInput(date)}T${pad(date.getHours())}:${pad(date.getMinutes())}`
-  }
+  // Event times arrive from the API as UTC instants ("...Z"), which FullCalendar shows in
+  // local time; the Dates it hands back are read on the local wall clock, which is what
+  // the form's datetime-local inputs hold (see eventTime.js).
 
   function handleDateClick(info) {
     let initial

@@ -34,6 +34,11 @@ router = APIRouter(prefix="/events", tags=["events"])
 # until that's built.
 
 
+# Times sent to this API should carry a UTC offset ("2026-10-01T13:00:00Z" or
+# "-04:00"): they're converted to UTC for storage. One without an offset is taken
+# as UTC as-is, which is what the page used to send (see frontend/src/lib/eventTime.js).
+
+
 class EventCreate(BaseModel):
     account_id: int
     title: str

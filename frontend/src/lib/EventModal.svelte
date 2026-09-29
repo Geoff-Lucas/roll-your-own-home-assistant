@@ -1,14 +1,13 @@
 <script>
   import { vkbd } from './keyboard/vkbd.js'
+  import { browserTimeZone, localInputToUtc } from './eventTime.js'
 
   // datetime-local/date inputs keep their native pickers — those are
   // already touch-friendly and don't need a QWERTY keyboard. Only the
   // title field opts into the in-app virtual keyboard (use:vkbd).
   //
-  // Also deliberately naive about timezones: datetime-local values carry no
-  // offset, and the backend's convention is naive-but-UTC (see
-  // app/time_utils.py), so what you type is taken as UTC as-is. Fine for a
-  // single-timezone household; revisit if that stops being true.
+  // datetime-local values are the household's wall clock and carry no offset, so
+  // they're turned into real UTC instants on the way out (see eventTime.js).
   let { open, mode, accounts, initial, onSave, onDelete, onClose } = $props()
 
   let title = $state('')
@@ -49,7 +48,11 @@
         all_day: allDay,
         ...(allDay
           ? { start_date: startValue, end_date: endValue }
-          : { start_time: startValue, end_time: endValue }),
+          : {
+              start_time: localInputToUtc(startValue),
+              end_time: localInputToUtc(endValue),
+              timezone: browserTimeZone(),
+            }),
         reminder_lead_days: needsReminder ? Number(reminderLeadDays) : null,
         reminder_text: needsReminder ? reminderText || null : null,
       }
