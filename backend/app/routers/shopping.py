@@ -1,14 +1,16 @@
 import uuid
 from datetime import date
-from typing import List
+from typing import List, Optional
 
+import segno
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, field_validator
 from sqlmodel import select
 
+from ..config import settings
 from ..db import SessionDep
 from ..models import MealPlan, Recipe, ShoppingItem
-from ..shopping import build_lines
+from ..shopping import build_lines, build_mailto, list_entries
 from ..time_utils import local_today, week_bounds
 
 router = APIRouter(prefix="/shopping-list", tags=["shopping-list"])
@@ -35,6 +37,12 @@ class ShoppingListRead(BaseModel):
     items: List[ShoppingItemRead]
 
 
+class ShareRead(BaseModel):
+    qr: Optional[str]  # an SVG image as a data: URI; None when there's nothing left to buy
+    included: int  # how many items the message holds
+    left_out: int  # how many didn't fit (a very long list); the message says so too
+
+
 class CheckedSet(BaseModel):
     key: str
     checked: bool
@@ -52,8 +60,7 @@ class ManualItem(BaseModel):
         return value
 
 
-@router.get("", response_model=ShoppingListRead)
-def get_shopping_list(session: SessionDep) -> ShoppingListRead:
+def _build_list(session) -> ShoppingListRead:
     today = local_today()
     week_start, week_end = week_bounds(today)
 
@@ -89,6 +96,26 @@ def get_shopping_list(session: SessionDep) -> ShoppingListRead:
         items.append(ShoppingItemRead(key=row.key, name=row.name, quantity="", recipes=[], checked=row.checked, manual=True))
 
     return ShoppingListRead(start=today, end=week_end, meals=len(meals), items=items)
+
+
+@router.get("", response_model=ShoppingListRead)
+def get_shopping_list(session: SessionDep) -> ShoppingListRead:
+    return _build_list(session)
+
+
+@router.get("/share", response_model=ShareRead)
+def share_shopping_list(session: SessionDep) -> ShareRead:
+    """A QR code that opens an email with what's left to buy, for a phone to scan.
+    Ticked items are left out: they're already in the trolley."""
+    current = _build_list(session)
+    todo = [item for item in current.items if not item.checked]
+    if not todo:
+        return ShareRead(qr=None, included=0, left_out=0)
+
+    header = f"Shopping list, {current.start:%b} {current.start.day} - {current.end:%b} {current.end.day}"
+    link, included = build_mailto(list_entries((i.name, i.quantity) for i in todo), header, settings.shopping_email_to)
+    code = segno.make(link, error="l", micro=False)
+    return ShareRead(qr=code.svg_data_uri(scale=1, border=4, dark="#000", light="#fff"), included=included, left_out=len(todo) - included)
 
 
 @router.put("/checked", status_code=204)

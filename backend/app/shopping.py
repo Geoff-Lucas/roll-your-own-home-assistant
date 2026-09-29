@@ -17,6 +17,7 @@ import re
 from dataclasses import dataclass, field
 from fractions import Fraction
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from urllib.parse import quote
 
 # A leading amount: "1 1/2", "3/4", "2", "0.5". What follows is the unit.
 _AMOUNT = re.compile(r"^\s*(\d+\s+\d+/\d+|\d+/\d+|\d+(?:\.\d+)?)\s*(.*?)\s*$")
@@ -147,3 +148,37 @@ def build_lines(meals: Iterable[Tuple[str, Sequence[Dict[str, Any]]]]) -> List[S
         ShoppingLine(key=key, name=line.name, quantity=line.quantity(), recipes=line.recipes)
         for key, line in sorted(lines.items())
     ]
+
+
+# --- sending the list to a phone ------------------------------------------------
+#
+# The kiosk shows a QR code; scanning it with a phone's camera opens a new email with
+# the list already in it (a mailto: link, so nothing needs setting up and nothing is
+# sent from the kiosk). A QR code can only hold so much before it gets too dense for a
+# phone to read across a kitchen, so a long list is cut short and says so.
+
+MAILTO_LIMIT = 1800  # bytes of link: a code 141 modules across at most, so the kiosk draws it large
+
+
+def list_entries(items: Iterable[Tuple[str, str]]) -> List[str]:
+    """[("chicken breast", "1 1/2 lb"), ("paper towels", "")] -> ["- Chicken breast: 1 1/2 lb", "- Paper towels"]"""
+    entries = []
+    for name, quantity in items:
+        label = name[:1].upper() + name[1:]
+        entries.append(f"- {label}: {quantity}" if quantity else f"- {label}")
+    return entries
+
+
+def build_mailto(entries: Sequence[str], header: str, to: str = "", limit: int = MAILTO_LIMIT) -> Tuple[str, int]:
+    """(link, how many entries fit). Drops entries from the end until the link fits, and
+    says how many were left off, so the message never silently loses items."""
+    subject = quote("Shopping list", safe="")
+    recipient = quote(to.strip(), safe="@,+")
+    for included in range(len(entries), -1, -1):
+        lines = [header, ""] + list(entries[:included])
+        if included < len(entries):
+            lines.append(f"...and {len(entries) - included} more (see the kiosk)")
+        link = f"mailto:{recipient}?subject={subject}&body={quote(chr(10).join(lines), safe='')}"
+        if len(link) <= limit:
+            return link, included
+    return link, 0

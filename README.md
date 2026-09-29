@@ -34,7 +34,9 @@ allergens. A week planner puts dinners on the calendar page, and from it the
 kiosk builds the **shopping list** for the rest of the week: the same
 ingredient across meals on one line with the amounts added up ("1 1/2 lb" and
 "1 lb" become "2 1/2 lb"), each showing which meals need it. Tap to tick things
-off, and add anything else by hand.
+off, and add anything else by hand. **Send to phone** shows a QR code: scan it
+with your phone's camera and it opens an email with what's left to buy, ready
+to send (nothing to set up, and nothing is sent from the kiosk).
 
 **Timers, alarms and a stopwatch.** They tick in the header and ring through
 the speakers whatever the screen is showing, and they survive restarts.

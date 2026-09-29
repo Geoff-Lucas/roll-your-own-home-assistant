@@ -1,8 +1,10 @@
 from fractions import Fraction
+from urllib.parse import parse_qs, unquote, urlsplit
 
 import pytest
+import segno
 
-from app.shopping import build_lines, format_amount, normalize_name, parse_quantity
+from app.shopping import MAILTO_LIMIT, build_lines, build_mailto, format_amount, list_entries, normalize_name, parse_quantity
 
 
 def ingredient(name, quantity=None):
@@ -136,3 +138,65 @@ def test_older_recipes_without_the_structured_fields_and_empty_lines_do_not_brea
 
     assert set(result) == {"2 cups flour", "sugar"}
     assert build_lines([("A", None)]) == []
+
+
+# --- sending the list to a phone ---------------------------------------------
+
+
+def opened(link):
+    """What a phone's email app would show for a mailto: link: (to, subject, body)."""
+    parts = urlsplit(link)
+    query = parse_qs(parts.query)
+    return unquote(parts.path), query["subject"][0], query["body"][0]
+
+
+def test_entries_read_like_a_list_you_would_write():
+    entries = list_entries([("chicken breast", "1 1/2 lb"), ("paper towels", ""), ("Eggs", "2")])
+
+    assert entries == ["- Chicken breast: 1 1/2 lb", "- Paper towels", "- Eggs: 2"]
+
+
+def test_the_link_opens_an_email_with_the_whole_list_in_it():
+    entries = list_entries([("chicken breast", "1 1/2 lb & more"), ("crème fraîche", "1 cup"), ("milk", "")])
+
+    link, included = build_mailto(entries, "Shopping list, Sep 28 - Oct 3", "me@example.com")
+
+    to, subject, body = opened(link)
+    assert (to, subject, included) == ("me@example.com", "Shopping list", 3)
+    assert body == "Shopping list, Sep 28 - Oct 3\n\n" + "\n".join(entries)  # nothing lost to the encoding
+
+
+def test_with_no_address_the_phone_is_left_to_ask():
+    link, _ = build_mailto(["- Milk"], "Shopping list")
+
+    assert link.startswith("mailto:?subject=")
+    assert opened(link)[0] == ""
+
+
+def test_a_long_list_is_cut_to_fit_and_says_how_many_were_left_off():
+    entries = list_entries([(f"ingredient number {n}", "1 1/2 cups") for n in range(200)])
+
+    link, included = build_mailto(entries, "Shopping list, Sep 28 - Oct 3", "me@example.com")
+
+    assert len(link) <= MAILTO_LIMIT
+    assert 0 < included < 200
+    body = opened(link)[2]
+    assert body.endswith(f"...and {200 - included} more (see the kiosk)")
+    assert body.count("- Ingredient") == included  # the first ones, in order, none skipped
+    assert "- Ingredient number 0:" in body
+
+
+def test_a_list_that_fits_is_not_cut_and_has_no_left_off_note():
+    link, included = build_mailto(list_entries([("milk", "1 cup")] * 10), "Shopping list")
+
+    assert included == 10
+    assert "more (see the kiosk)" not in opened(link)[2]
+
+
+def test_the_biggest_message_still_makes_a_code_a_phone_can_read():
+    entries = list_entries([(f"ingredient number {n}", "1 1/2 cups") for n in range(500)])
+
+    link, _ = build_mailto(entries, "Shopping list, Sep 28 - Oct 3", "someone.with.a.long.address@example.com")
+    code = segno.make(link, error="l", micro=False)
+
+    assert code.version <= 31  # 141 modules across: dense, which is why the kiosk shows it large

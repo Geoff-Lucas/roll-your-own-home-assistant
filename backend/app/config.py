@@ -115,6 +115,11 @@ class Settings(BaseSettings):
     voice_restart_enabled: bool = True
     voice_restart_confirm_seconds: int = 30
 
+    # The shopping list's "Send to phone" QR code opens a new email on the phone.
+    # Set an address here to have it filled in as the recipient (your own, say), so
+    # all that's left is tapping Send. Blank leaves it for the phone to ask.
+    shopping_email_to: str = ""
+
     @property
     def voice_models_dir(self) -> Path:
         return self.data_dir / "voice" / "models"

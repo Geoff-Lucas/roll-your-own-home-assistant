@@ -139,6 +139,10 @@ export function getShoppingList() {
   return request('/shopping-list')
 }
 
+export function getShoppingShare() {
+  return request('/shopping-list/share')
+}
+
 export function setShoppingChecked(key, checked) {
   return requestJson('/shopping-list/checked', 'PUT', { key, checked })
 }

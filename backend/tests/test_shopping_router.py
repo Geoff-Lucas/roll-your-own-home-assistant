@@ -142,6 +142,63 @@ def test_unknown_items_are_a_404_not_a_silent_success(setup):
     assert client.delete("/shopping-list/manual/manual:nope").status_code == 404
 
 
+@pytest.fixture
+def sent(monkeypatch):
+    """What the QR code's email is built from, captured as it's made."""
+    seen = {}
+    real = shopping_module.build_mailto
+
+    def spy(entries, header, to="", *args, **kwargs):
+        seen.update(entries=list(entries), header=header, to=to)
+        return real(entries, header, to, *args, **kwargs)
+
+    monkeypatch.setattr(shopping_module, "build_mailto", spy)
+    return seen
+
+
+def test_the_qr_code_carries_what_is_left_to_buy(setup, sent, monkeypatch):
+    client, _, plan, _ = setup
+    monkeypatch.setattr(shopping_module.settings, "shopping_email_to", "me@example.com")
+    plan(date(2026, 9, 23), 1)
+    plan(date(2026, 9, 25), 2)
+    client.post("/shopping-list/manual", json={"name": "paper towels"})
+    onion = next(i["key"] for i in client.get("/shopping-list").json()["items"] if i["name"] == "yellow onion")
+    client.put("/shopping-list/checked", json={"key": onion, "checked": True})
+
+    body = client.get("/shopping-list/share").json()
+
+    assert body["qr"].startswith("data:image/svg+xml")
+    assert (body["included"], body["left_out"]) == (3, 0)
+    # Ticked items are already in the trolley, so they're not in the message; hand-added ones are.
+    assert sent["entries"] == ["- Chuck roast: 3 lb", "- Ground beef: 1 lb", "- Paper towels"]
+    assert sent["header"] == "Shopping list, Sep 23 - Sep 26"
+    assert sent["to"] == "me@example.com"
+
+
+def test_with_everything_ticked_or_nothing_planned_there_is_no_code(setup):
+    client, _, plan, _ = setup
+    assert client.get("/shopping-list/share").json() == {"qr": None, "included": 0, "left_out": 0}
+
+    plan(date(2026, 9, 23), 3)
+    key = client.get("/shopping-list").json()["items"][0]["key"]
+    client.put("/shopping-list/checked", json={"key": key, "checked": True})
+
+    assert client.get("/shopping-list/share").json()["qr"] is None
+
+
+def test_a_very_long_list_still_gives_a_code_and_says_what_it_left_out(setup):
+    client, engine, plan, _ = setup
+    with Session(engine) as session:
+        session.add(Recipe(id=9, title="Feast", ingredients=[item(f"ingredient number {n}", "1 1/2 cups") for n in range(150)]))
+        session.commit()
+    plan(date(2026, 9, 23), 9)
+
+    body = client.get("/shopping-list/share").json()
+
+    assert body["qr"].startswith("data:image/svg+xml")
+    assert body["left_out"] > 0 and body["included"] + body["left_out"] == 150
+
+
 def test_only_hand_added_items_can_be_removed(setup):
     client, _, plan, _ = setup
     plan(date(2026, 9, 23), 1)

@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte'
-  import { addShoppingItem, getShoppingList, removeShoppingItem, setShoppingChecked } from '../api.js'
+  import { addShoppingItem, getShoppingList, getShoppingShare, removeShoppingItem, setShoppingChecked } from '../api.js'
   import { vkbd } from '../keyboard/vkbd.js'
   import { ordered, summary } from './order.js'
 
@@ -12,8 +12,20 @@
   let list = $state(null)
   let error = $state(null)
   let newItem = $state('')
+  let sharing = $state(null) // the QR code for the phone, while it's on screen
 
   const items = $derived(list ? ordered(list.items) : [])
+
+  // A QR code that opens an email with what's left to buy; scanning it with a phone's
+  // camera is all it takes, and nothing is sent from here.
+  async function share() {
+    try {
+      sharing = await getShoppingShare()
+      error = null
+    } catch (err) {
+      error = err.message
+    }
+  }
 
   async function load() {
     try {
@@ -61,6 +73,24 @@
 </script>
 
 <div class="overlay" role="presentation" onclick={onClose}>
+  {#if sharing}
+    <div class="modal wide" role="dialog" aria-modal="true" aria-label="Send to phone" onclick={(e) => e.stopPropagation()}>
+      <h3>Send to phone</h3>
+      {#if sharing.qr}
+        <p class="summary">Point your phone's camera at this. It opens an email with the list, ready to send.</p>
+        <img class="qr" src={sharing.qr} alt="A QR code that opens an email with the shopping list" />
+        {#if sharing.left_out > 0}
+          <p class="note">
+            The list was too long for one code: the email has the first {sharing.included} items and says {sharing.left_out} more
+            are on the kiosk.
+          </p>
+        {/if}
+      {:else}
+        <p class="summary">There's nothing left to buy, so there's nothing to send.</p>
+      {/if}
+      <button type="button" class="close" onclick={() => (sharing = null)}>Back to the list</button>
+    </div>
+  {:else}
   <div class="modal" role="dialog" aria-modal="true" aria-label="Shopping list" onclick={(e) => e.stopPropagation()}>
     <h3>Shopping list</h3>
     {#if list}
@@ -98,8 +128,12 @@
       {/each}
     </ul>
 
-    <button type="button" class="close" onclick={onClose}>Close</button>
+    <div class="footer">
+      <button type="button" class="close" onclick={share}>📱 Send to phone</button>
+      <button type="button" class="close" onclick={onClose}>Close</button>
+    </div>
   </div>
+  {/if}
 </div>
 
 <style>
@@ -268,6 +302,17 @@
     font-size: 1.05rem;
   }
 
+  .footer {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 0.9rem;
+  }
+
+  .footer .close {
+    flex: 1;
+    margin-top: 0;
+  }
+
   .close {
     margin-top: 0.9rem;
     padding: 0.7rem;
@@ -276,6 +321,30 @@
     border-radius: 0.4rem;
     background: #f2f2f2;
     cursor: pointer;
+  }
+
+  /* The code is dense on a full list, so it's drawn as big as the screen allows. */
+  .modal.wide {
+    width: min(94vw, 64rem);
+    max-height: 90vh;
+    align-items: center;
+    text-align: center;
+  }
+
+  .modal.wide .close {
+    align-self: stretch;
+  }
+
+  .qr {
+    width: min(100%, 60vh);
+    aspect-ratio: 1;
+    margin: 0.25rem 0;
+    image-rendering: crisp-edges;
+  }
+
+  .note {
+    margin: 0.4rem 0 0;
+    opacity: 0.75;
   }
 
   .error {
