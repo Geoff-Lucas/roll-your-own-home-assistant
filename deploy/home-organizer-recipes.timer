@@ -1,0 +1,10 @@
+[Unit]
+Description=Every 15 minutes, add recipes sent from the PC
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=15min
+# Not Persistent: a run missed while the kiosk was off is just the next one.
+
+[Install]
+WantedBy=timers.target

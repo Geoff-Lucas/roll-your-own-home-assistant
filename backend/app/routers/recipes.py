@@ -61,6 +61,7 @@ class RecipeCreate(BaseModel):
     dietary_tags: List[str] = []
     allergens: List[str] = []
     source_url: Optional[str] = None
+    source_image_url: Optional[str] = None
     prep_time_minutes: Minutes = None
     cook_time_minutes: Minutes = None
     servings: Servings = None
@@ -88,8 +89,9 @@ def _tidy(data: dict) -> dict:
     for field in ("tags", "dietary_tags", "allergens"):
         if data.get(field) is not None:
             data[field] = _tidy_tags(data[field])
-    if isinstance(data.get("source_url"), str):
-        data["source_url"] = data["source_url"].strip() or None
+    for field in ("source_url", "source_image_url"):
+        if isinstance(data.get(field), str):
+            data[field] = data[field].strip() or None
     return data
 
 

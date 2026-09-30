@@ -499,6 +499,30 @@ To restore, stop the app first (`sudo systemctl stop home-organizer`). Copy a
 dated `.db` over `backend/data/home_organizer.db` and the image folders back
 into `backend/data/`, then start the app again.
 
+### Recipes from the PC
+
+The Windows **Recipe Importer** program (its own project, `local_recipe_importer`)
+saves recipes to the NAS instead of to the kiosk. Every 15 minutes
+`deploy/pull-recipes-from-nas.sh` mounts the share, adds whatever is waiting in
+`home_organizer/recipes/inbox/`, and unmounts. It needs the same
+`/etc/home-organizer/nas.credentials` as the backups.
+
+Each recipe is a `.json` file (plus a photo beside it, if it has one). Once
+handled, the files move to `inbox/imported/`, or to `inbox/failed/` with a
+`.error.txt` beside them saying why. A recipe whose page is already on the
+kiosk, or that matches one by title, ingredients and steps, isn't added twice.
+Nothing is started when the inbox is empty, so the timer costs a brief mount.
+
+```bash
+for unit in home-organizer-recipes.service home-organizer-recipes.timer; do
+  sed "s/KIOSK_USER/$USER/g" ~/home_organizer/deploy/$unit | sudo tee /etc/systemd/system/$unit >/dev/null
+done
+sudo systemctl daemon-reload
+sudo systemctl enable --now home-organizer-recipes.timer
+sudo systemctl start home-organizer-recipes      # one run now, to check it works
+journalctl -u home-organizer-recipes -n 10       # what was added, or why not
+```
+
 ### The Browser tab
 
 The **Browser** tab in the header shows a real web browser under the toolbar,
