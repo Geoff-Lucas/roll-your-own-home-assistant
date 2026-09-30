@@ -396,14 +396,23 @@ own kiosk window, since a click on it can only reach the backend while that
 window has focus. It's for a quick look at the desktop (plugging something in,
 a file manager) without leaving the kiosk session.
 
-Getting back is the part a kiosk doesn't have a taskbar for, so
-`deploy/kiosk.sh` installs a **"Home Organizer" icon on the desktop** every
-login, running `deploy/return-to-kiosk.sh`: it brings the existing window
-back (deiconify, raise, focus, all via `xdotool windowactivate`) or, if the
-window is gone entirely — crashed, or the session restarted without going
-through `kiosk.sh` — starts the kiosk fresh instead. Only works on the kiosk
-itself (needs a display and `xdotool`); everywhere else `/system/minimize`
-reports 503, same convention as the Browser tab's endpoints.
+While the app is minimized the XFCE **panel** (taskbar, app menu, tray) is
+back: minimizing starts `xfce4-panel`, and the backend watches the app's window
+(`xprop WM_STATE`, once a second) and quits the panel again the moment the
+window is restored, whether from the panel's taskbar or the desktop icon below.
+The panel is hidden the rest of the time, as `deploy/kiosk.sh` does at login,
+so that a touch at a screen edge can't pop it over the app's header. (Restarting
+the app while it is minimized also ends the panel, since the service owns the
+process; the next login or restore hides it anyway.)
+
+The other way back is a **"Home Organizer" icon on the desktop**, which
+`deploy/kiosk.sh` installs every login, running `deploy/return-to-kiosk.sh`: it
+brings the existing window back (deiconify, raise, focus, all via `xdotool
+windowactivate`) and quits the panel, or, if the window is gone entirely —
+crashed, or the session restarted without going through `kiosk.sh` — starts the
+kiosk fresh instead. Only works on the kiosk itself (needs a display, `xdotool`
+and `xprop`); everywhere else `/system/minimize` reports 503, same convention
+as the Browser tab's endpoints.
 
 Getting a `.desktop` launcher to just run, with no clicks in between, took
 three things (all verified on this machine, XFCE 4.20 / gvfs 1.57):
@@ -547,7 +556,8 @@ Three things make the layering work, all handled by `deploy/kiosk.sh`:
   kiosk mode; a normal or `--app` window gets a title bar that can't be
   removed), then taken out of fullscreen and placed with `wmctrl`.
 - The XFCE panels are quit on login, since without fullscreen protection they
-  would pop up over the header when a screen edge is touched.
+  would pop up over the header when a screen edge is touched. (They come back
+  while the app is minimized to the desktop; see "Minimizing to the desktop".)
 
 While the Browser tab is open the photo carousel is suspended (touches inside
 the browser window aren't visible to the app), and the overnight dimming does
