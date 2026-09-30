@@ -8,7 +8,7 @@ After=network-online.target
 [Service]
 Type=oneshot
 # Root, because mounting the share needs it; the import itself drops to KIOSK_USER.
-Environment=KIOSK_USER=KIOSK_USER
+Environment=APP_USER=KIOSK_USER
 Environment=BACKEND_DIR=/home/KIOSK_USER/home_organizer/backend
 ExecStart=/bin/bash /home/KIOSK_USER/home_organizer/deploy/pull-recipes-from-nas.sh
 # A NAS that doesn't answer shouldn't leave this running until the next one.

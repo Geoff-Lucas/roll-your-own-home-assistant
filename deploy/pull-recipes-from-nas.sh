@@ -16,7 +16,7 @@ set -euo pipefail
 NAS_SHARE="${NAS_SHARE:-//LUCAS-HOME-NAS.local/Home}"
 NAS_BASE="${NAS_BASE:-home_organizer}"
 NAS_CREDENTIALS="${NAS_CREDENTIALS:-/etc/home-organizer/nas.credentials}"
-: "${KIOSK_USER:?set KIOSK_USER to the account the app runs as}"
+: "${APP_USER:?set APP_USER to the account the app runs as}"
 : "${BACKEND_DIR:?set BACKEND_DIR to the backend folder (where .env lives)}"
 PYTHON="${PYTHON:-$BACKEND_DIR/.venv/bin/python}"
 
@@ -37,7 +37,7 @@ trap cleanup EXIT
 # The user owns the files on the share for this run, so the import can move
 # them to imported/ and failed/ without being root.
 mount -t cifs "$NAS_SHARE" "$mnt" \
-  -o "credentials=$NAS_CREDENTIALS,iocharset=utf8,noperm,soft,echo_interval=10,uid=$(id -u "$KIOSK_USER"),gid=$(id -g "$KIOSK_USER")"
+  -o "credentials=$NAS_CREDENTIALS,iocharset=utf8,noperm,soft,echo_interval=10,uid=$(id -u "$APP_USER"),gid=$(id -g "$APP_USER")"
 
 inbox="$mnt/$NAS_BASE/recipes/inbox"
 if [ ! -d "$inbox" ]; then
@@ -51,4 +51,4 @@ if ! compgen -G "$inbox/*.json" >/dev/null; then
 fi
 
 cd "$BACKEND_DIR"
-runuser -u "$KIOSK_USER" -- "$PYTHON" -m app.recipes.inbox "$inbox"
+runuser -u "$APP_USER" -- "$PYTHON" -m app.recipes.inbox "$inbox"
