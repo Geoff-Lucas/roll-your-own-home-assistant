@@ -138,9 +138,37 @@ def test_a_window_reads_as_minimized_or_normal_or_gone(monkeypatch):
     assert [system._window_state(w) for w in ("min", "up", "gone")] == ["Iconic", "Normal", None]
 
 
-def test_the_panel_is_started_detached_unless_it_is_already_running(monkeypatch):
+class FakePanel:
+    """Stands in for the panel process the app starts."""
+
+    def __init__(self, alive=True, stubborn=False):
+        self.alive, self.stubborn, self.calls = alive, stubborn, []
+
+    def poll(self):
+        return None if self.alive else 0
+
+    def terminate(self):
+        self.calls.append("terminate")
+        self.alive = self.alive and self.stubborn
+
+    def kill(self):
+        self.calls.append("kill")
+        self.alive = False
+
+    def wait(self, timeout):
+        self.calls.append("wait")
+        if self.alive:
+            raise system.subprocess.TimeoutExpired(cmd="xfce4-panel", timeout=timeout)
+
+
+@pytest.fixture(autouse=True)
+def no_panel_left_over(monkeypatch):
+    monkeypatch.setattr(system, "_panel", None)
+
+
+def test_the_panel_is_started_detached_and_remembered(monkeypatch):
     started = []
-    monkeypatch.setattr(system.subprocess, "Popen", lambda command, **kwargs: started.append((command, kwargs)))
+    monkeypatch.setattr(system.subprocess, "Popen", lambda command, **kwargs: started.append((command, kwargs)) or FakePanel())
     monkeypatch.setattr(system, "_panel_is_running", lambda: False)
 
     system.show_panel()
@@ -149,11 +177,31 @@ def test_the_panel_is_started_detached_unless_it_is_already_running(monkeypatch)
     assert command == ["xfce4-panel"]
     assert kwargs["start_new_session"] is True
     assert kwargs["env"]["DISPLAY"] == system.settings.browser_display
+    assert system._panel is not None
 
-    started.clear()
-    monkeypatch.setattr(system, "_panel_is_running", lambda: True)
+
+def test_a_panel_already_showing_is_left_alone(monkeypatch):
+    started = []
+    monkeypatch.setattr(system.subprocess, "Popen", lambda command, **kwargs: started.append(command))
+
+    monkeypatch.setattr(system, "_panel", FakePanel(alive=True))  # ours
     system.show_panel()
+    monkeypatch.setattr(system, "_panel", None)
+    monkeypatch.setattr(system, "_panel_is_running", lambda: True)  # someone else's
+    system.show_panel()
+
     assert started == []
+
+
+def test_a_panel_that_exited_is_started_again(monkeypatch):
+    started = []
+    monkeypatch.setattr(system.subprocess, "Popen", lambda command, **kwargs: started.append(command) or FakePanel())
+    monkeypatch.setattr(system, "_panel", FakePanel(alive=False))
+    monkeypatch.setattr(system, "_panel_is_running", lambda: False)
+
+    system.show_panel()
+
+    assert started == [["xfce4-panel"]]
 
 
 def test_a_panel_that_wont_start_doesnt_break_minimizing(monkeypatch):
@@ -164,19 +212,55 @@ def test_a_panel_that_wont_start_doesnt_break_minimizing(monkeypatch):
     monkeypatch.setattr(system, "_panel_is_running", lambda: False)
 
     system.show_panel()  # logs, does not raise
+    assert system._panel is None
 
 
-def test_hiding_the_panel_quits_it(monkeypatch):
-    seen = []
-
-    class Result:
-        returncode = 0
-
-    monkeypatch.setattr(system.subprocess, "run", lambda command, **kwargs: seen.append(command) or Result())
+def test_hiding_stops_the_panel_the_app_started_and_reaps_it(monkeypatch):
+    panel = FakePanel()
+    monkeypatch.setattr(system, "_panel", panel)
+    monkeypatch.setattr(system.subprocess, "run", lambda *a, **k: pytest.fail("shouldn't ask a panel it owns to quit"))
 
     system.hide_panel()
 
-    assert seen == [["xfce4-panel", "--quit"]]
+    assert panel.calls == ["terminate", "wait"]
+    assert system._panel is None
+
+
+def test_a_panel_that_ignores_being_stopped_is_killed(monkeypatch):
+    panel = FakePanel(stubborn=True)
+    monkeypatch.setattr(system, "_panel", panel)
+
+    system.hide_panel()
+
+    assert panel.calls == ["terminate", "wait", "kill", "wait"]
+
+
+def test_a_panel_that_already_went_away_is_just_reaped(monkeypatch):
+    panel = FakePanel(alive=False)
+    monkeypatch.setattr(system, "_panel", panel)
+
+    system.hide_panel()
+
+    assert panel.calls == []
+    assert system._panel is None
+
+
+def test_a_panel_the_app_didnt_start_is_asked_to_quit(monkeypatch):
+    seen = []
+    monkeypatch.setattr(system.subprocess, "run", lambda command, **kwargs: seen.append((command, kwargs["timeout"])))
+
+    system.hide_panel()
+
+    assert seen == [(["xfce4-panel", "--quit"], 5)]
+
+
+def test_asking_a_panel_that_isnt_there_to_quit_gives_up_quietly(monkeypatch):
+    def hangs(*args, **kwargs):
+        raise system.subprocess.TimeoutExpired(cmd="xfce4-panel", timeout=5)
+
+    monkeypatch.setattr(system.subprocess, "run", hangs)
+
+    system.hide_panel()  # a warning in the log, no exception
 
 
 def test_the_session_bus_is_found_from_the_runtime_directory(monkeypatch):

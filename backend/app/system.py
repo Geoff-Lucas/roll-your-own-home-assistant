@@ -52,30 +52,55 @@ def _panel_is_running() -> bool:
     return result.returncode == 0
 
 
+# The panel this app started, so it can be stopped (and reaped) directly.
+# `xfce4-panel --quit` isn't used for that: it hangs when it can't find a panel
+# to talk to, which is the case in the first moments after one is started.
+_panel: Optional[subprocess.Popen] = None
+_panel_lock = threading.Lock()
+
+
 def show_panel() -> None:
     """Brings the desktop panel (taskbar, menu) back. Only a convenience, so a
     failure is logged rather than stopping the minimize that asked for it."""
+    global _panel
     try:
-        if _panel_is_running():
-            return
-        # Detached, so it keeps running on its own and isn't waited for.
-        subprocess.Popen(
-            ["xfce4-panel"],
-            env=_env(),
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            start_new_session=True,
-        )
+        with _panel_lock:
+            if _panel is not None and _panel.poll() is None:
+                return
+            if _panel_is_running():
+                return  # someone else's; leave it be
+            _panel = subprocess.Popen(
+                ["xfce4-panel"],
+                env=_env(),
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
     except (OSError, subprocess.SubprocessError):
         logger.exception("Couldn't bring the desktop panel back")
 
 
 def hide_panel() -> None:
-    """Quits the panel again (same as deploy/kiosk.sh does at login). A failure
-    just means it wasn't running."""
+    """Puts the panel away again (deploy/kiosk.sh quits it at login too)."""
+    global _panel
+    with _panel_lock:
+        ours, _panel = _panel, None
     try:
+        if ours is not None:
+            if ours.poll() is None:
+                ours.terminate()
+                try:
+                    ours.wait(timeout=3)
+                except subprocess.TimeoutExpired:
+                    ours.kill()
+                    ours.wait(timeout=3)
+            return  # (an exited one is reaped by poll(); nothing left to quit)
+        # Not started by this app (it was running already, or the backend
+        # restarted since): ask it nicely. run() kills the request if it hangs.
         subprocess.run(["xfce4-panel", "--quit"], capture_output=True, timeout=5, env=_env())
+    except subprocess.TimeoutExpired:
+        logger.warning("The desktop panel didn't answer a request to quit (probably not running)")
     except (OSError, subprocess.SubprocessError):
         logger.exception("Couldn't hide the desktop panel")
 

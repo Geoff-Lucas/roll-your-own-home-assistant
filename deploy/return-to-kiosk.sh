@@ -11,8 +11,10 @@ export DISPLAY=:0
 if xdotool search --name "Home Organizer" windowactivate; then
   # The backend brought the panel back when the app was minimized and hides it
   # again on its own once the window is restored; doing it here as well makes
-  # it instant, and covers the backend having restarted in between.
-  xfce4-panel --quit 2>/dev/null
+  # it instant, and covers the backend having restarted in between. In the
+  # background and time-limited, because `xfce4-panel --quit` hangs forever
+  # when there is no panel running to receive it.
+  (timeout 5 xfce4-panel --quit >/dev/null 2>&1 &)
   exit 0
 fi
 

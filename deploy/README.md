@@ -398,12 +398,19 @@ a file manager) without leaving the kiosk session.
 
 While the app is minimized the XFCE **panel** (taskbar, app menu, tray) is
 back: minimizing starts `xfce4-panel`, and the backend watches the app's window
-(`xprop WM_STATE`, once a second) and quits the panel again the moment the
+(`xprop WM_STATE`, once a second) and stops the panel again the moment the
 window is restored, whether from the panel's taskbar or the desktop icon below.
 The panel is hidden the rest of the time, as `deploy/kiosk.sh` does at login,
 so that a touch at a screen edge can't pop it over the app's header. (Restarting
 the app while it is minimized also ends the panel, since the service owns the
 process; the next login or restore hides it anyway.)
+
+The backend stops the panel by ending the process it started, not with
+`xfce4-panel --quit`: that command waits forever if it can't find a panel to
+talk to, which is what it finds in the first moments after one is started (or
+when none is running). Run it by hand only with a time limit
+(`timeout 5 xfce4-panel --quit`); a stuck one is also named `xfce4-panel` and
+looks like a running panel to `pgrep -x`.
 
 The other way back is a **"Home Organizer" icon on the desktop**, which
 `deploy/kiosk.sh` installs every login, running `deploy/return-to-kiosk.sh`: it
