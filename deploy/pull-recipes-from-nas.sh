@@ -13,16 +13,20 @@
 # that is down costs one skipped run, never a hung kiosk.
 set -euo pipefail
 
-NAS_SHARE="${NAS_SHARE:-//LUCAS-HOME-NAS.local/Home}"
+NAS_SHARE="${NAS_SHARE:-//LUCAS-HOME-NAS.local/HomeBulk}"
 NAS_BASE="${NAS_BASE:-home_organizer}"
 NAS_CREDENTIALS="${NAS_CREDENTIALS:-/etc/home-organizer/nas.credentials}"
 : "${APP_USER:?set APP_USER to the account the app runs as}"
 : "${BACKEND_DIR:?set BACKEND_DIR to the backend folder (where .env lives)}"
 PYTHON="${PYTHON:-$BACKEND_DIR/.venv/bin/python}"
 
-if [ ! -r "$NAS_CREDENTIALS" ]; then
-  echo "No NAS credentials at $NAS_CREDENTIALS — see deploy/README.md 'Backups to the NAS'" >&2
-  exit 1
+# A login is used if the file exists; without one the share is mounted as a guest, which
+# the NAS's HomeBulk share allows (asked for as a user named "guest" with an empty password:
+# this NAS refuses the plain "guest" mount option).
+if [ -r "$NAS_CREDENTIALS" ]; then
+  auth="credentials=$NAS_CREDENTIALS"
+else
+  auth="username=guest,password="
 fi
 
 work=$(mktemp -d /run/home-organizer-recipes.XXXXXX)
@@ -37,7 +41,7 @@ trap cleanup EXIT
 # The user owns the files on the share for this run, so the import can move
 # them to imported/ and failed/ without being root.
 mount -t cifs "$NAS_SHARE" "$mnt" \
-  -o "credentials=$NAS_CREDENTIALS,iocharset=utf8,noperm,soft,echo_interval=10,uid=$(id -u "$APP_USER"),gid=$(id -g "$APP_USER")"
+  -o "$auth,vers=3.1.1,iocharset=utf8,noperm,soft,echo_interval=10,uid=$(id -u "$APP_USER"),gid=$(id -g "$APP_USER")"
 
 inbox="$mnt/$NAS_BASE/recipes/inbox"
 if [ ! -d "$inbox" ]; then

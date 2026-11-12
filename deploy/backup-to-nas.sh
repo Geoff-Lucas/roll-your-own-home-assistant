@@ -20,16 +20,20 @@
 # `journalctl -u home-organizer-backup`), never a hung kiosk.
 set -euo pipefail
 
-NAS_SHARE="${NAS_SHARE:-//LUCAS-HOME-NAS.local/Home}"
+NAS_SHARE="${NAS_SHARE:-//LUCAS-HOME-NAS.local/HomeBulk}"
 NAS_BASE="${NAS_BASE:-home_organizer}"
 NAS_CREDENTIALS="${NAS_CREDENTIALS:-/etc/home-organizer/nas.credentials}"
 KEEP_DAYS="${KEEP_DAYS:-30}"
 : "${DATA_DIR:?set DATA_DIR to the backend data directory}"
 PYTHON="${PYTHON:-python3}"
 
-if [ ! -r "$NAS_CREDENTIALS" ]; then
-  echo "No NAS credentials at $NAS_CREDENTIALS — see deploy/README.md 'Backups to the NAS'" >&2
-  exit 1
+# A login is used if the file exists. Without one the share is mounted as a guest, which
+# the NAS's HomeBulk share allows. It has to be asked for as a user named "guest" with an
+# empty password: this NAS refuses the plain "guest" mount option.
+if [ -r "$NAS_CREDENTIALS" ]; then
+  auth="credentials=$NAS_CREDENTIALS"
+else
+  auth="username=guest,password="
 fi
 
 work=$(mktemp -d /run/home-organizer-backup.XXXXXX)
@@ -55,7 +59,7 @@ if result != "ok":
 PY
 
 mount -t cifs "$NAS_SHARE" "$mnt" \
-  -o "credentials=$NAS_CREDENTIALS,iocharset=utf8,noperm,soft,echo_interval=10"
+  -o "$auth,vers=3.1.1,iocharset=utf8,noperm,soft,echo_interval=10"
 
 base="$mnt/$NAS_BASE"
 if [ ! -d "$base" ]; then

@@ -465,7 +465,8 @@ echo "$USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl reboot" \
 
 Every night at about 3:30 (or soon after the next boot, if the kiosk was off),
 `deploy/backup-to-nas.sh` copies the kiosk's own data to
-`\\LUCAS-HOME-NAS\Home\home_organizer`:
+`\\LUCAS-HOME-NAS\HomeBulk\home_organizer` (make that folder on the share first;
+the script won't create it):
 
 - `recipes/database/home_organizer-YYYY-MM-DD.db`: the whole app database,
   one per day, the last 30 kept (`KEEP_DAYS`). It covers recipes, the meal
@@ -481,12 +482,15 @@ without that key works, but you have to sign in to the calendars again.
 backed up either.
 
 The share is mounted only while the backup runs. A NAS that's down costs one
-missed night: the run fails and says why, and the kiosk carries on. The NAS
-doesn't allow guest access, so it needs a login, kept in a root-only file (on
-the machine):
+missed night: the run fails and says why, and the kiosk carries on.
+
+**Logging in.** The NAS's HomeBulk and HomeFast shares allow guests, so no login is
+needed: with no credentials file the script connects as a user named `guest` with an
+empty password (this NAS refuses the plain `guest` mount option, which is why). If the
+NAS is ever locked down, put a login in a root-only file and the script uses it
+instead (on the machine):
 
 ```bash
-sudo apt install -y cifs-utils
 sudo install -d -m 700 /etc/home-organizer
 sudo install -m 600 /dev/null /etc/home-organizer/nas.credentials
 sudoedit /etc/home-organizer/nas.credentials
@@ -499,7 +503,7 @@ username=<NAS user>
 password=<NAS password>
 ```
 
-Then install the timer:
+Install the timer (`sudo apt install -y cifs-utils` first, if it isn't there):
 
 ```bash
 for unit in home-organizer-backup.service home-organizer-backup.timer; do
@@ -521,7 +525,8 @@ The Windows **Recipe Importer** program (its own project, `local_recipe_importer
 saves recipes to the NAS instead of to the kiosk. Every 15 minutes
 `deploy/pull-recipes-from-nas.sh` mounts the share, adds whatever is waiting in
 `home_organizer/recipes/inbox/`, and unmounts. It needs the same
-`/etc/home-organizer/nas.credentials` as the backups.
+connection as the backups (guest access, or `/etc/home-organizer/nas.credentials`
+if there is one).
 
 Each recipe is a `.json` file (plus a photo beside it, if it has one). Once
 handled, the files move to `inbox/imported/`, or to `inbox/failed/` with a
